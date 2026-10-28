@@ -1,4 +1,4 @@
-# CommitOps Local
+# Your Local Cost Explorer
 
 A local-only AWS billing dashboard, with its own light dashboard design and sidebar navigation. Upload CUR CSV, CSV.gz or Parquet exports and review reported charges, all eight detectors, commitment consumption, allocation and supporting evidence on your device.
 
@@ -7,8 +7,8 @@ A local-only AWS billing dashboard, with its own light dashboard design and side
 Install Node.js 20+ with npm, then:
 
 ```sh
-npm install -g commitops-local
-commitops-local
+npm install -g your-local-cost-explorer
+your-local-cost-explorer
 ```
 
 The package's install step automatically provisions a private Python 3.12 runtime and all pinned analysis dependencies. Python, pip, DuckDB and Arrow do not need separate installation. It downloads a pinned, SHA256-verified Astral uv binary and uses it to install managed Python and public PyPI wheels. Supported platforms: Windows, macOS and Linux (glibc), x64 and ARM64. Installation requires internet and sufficient free disk space. Node/npm are prerequisites because npm itself runs the installer; no administrator permissions are needed.
@@ -16,18 +16,18 @@ The package's install step automatically provisions a private Python 3.12 runtim
 The first launch also checks setup, so environments that skip npm lifecycle scripts can recover automatically. To retry an interrupted installation:
 
 ```sh
-commitops-local --setup
+your-local-cost-explorer --setup
 ```
 
 Setup never opens or analyses billing files. Subsequent launches work offline after successful installation; ordinary analysis disables outbound Python sockets and DuckDB remote extension loading. Dependencies and runtime tools live privately under your user data directory, not inside the downloaded package. Installation does not change system Python or global PATH.
 
-Open the printed `http://127.0.0.1:8080/#token=...` URL. Keep the launch token private. Use `commitops-local --port 8081` if 8080 is busy. `commitops-local --help` does not download or start anything.
+Open the printed `http://127.0.0.1:8080/#token=...` URL. Keep the launch token private. Use `your-local-cost-explorer --port 8081` if 8080 is busy. `your-local-cost-explorer --help` does not download or start anything.
 
 ## Install from GitHub
 
 ```sh
-git clone https://github.com/leejan2647-a11y/commitops-local.git
-cd commitops-local
+git clone https://github.com/leejan2647-a11y/your-local-cost-explorer.git
+cd your-local-cost-explorer
 npm install
 npm start
 ```
@@ -36,13 +36,13 @@ npm start
 
 ## Manual workflow
 
-1. **Check Charges:** select local primary/comparison files, non-overlapping dates and optional service expectations; run or cancel a check.
+1. **Dashboard billing files → Check Charges:** upload primary files on the Dashboard. The app detects their observed usage-date bounds and offers supported last 7, 30, 90 or 180 days ending at the latest supplied date. All earlier rows form the baseline. A 30-day export offers 7 and 30 days; selecting all 30 leaves no historical baseline. Bounds do not prove complete coverage. Choose manual dates when needed, optional service expectations, then run or cancel a check. Below the baseline dates, choose earlier rows, retained files from a previous completed check, or comparison files from your device. Comparison files stay separate; missing or changed retained sources are refused.
 2. **Dashboard:** view reported charges, canonical observations, coverage, monthly observations and supported usage comparisons for a selected saved check.
 3. **Findings:** search/filter by service/account/text, severity, detector and review status; inspect billing-row evidence; save local notes/statuses; archive and restore findings. Review annotations never rewrite calculated financial evidence.
 4. **Commitments:** review Savings Plans/reserved instances, purchased/used/unused amounts and inventory limitations.
 5. **Allocation and team mappings:** view supported category/account consumption, map 12-digit AWS account IDs to local teams, and preserve the mapping snapshot used by each result. Run a new manual check to apply changed mappings to new results.
 6. **Reports:** generate named snapshots from one or several completed checks, rename/archive/restore/download/delete saved reports, download complete JSON, a readable standalone meeting HTML report or findings CSV, or print locally. Multiple check snapshots remain separate; totals are never added together. Whole-check reports are distinct from filtered findings views. CSV text is protected against spreadsheet formula interpretation.
-7. **Data Sources:** select retained file identities, inspect names/bytes/roles/hashes, remove files explicitly, and preserve already saved result evidence.
+7. **Dashboard billing files:** select retained file identities, inspect names/bytes/roles/hashes, remove files explicitly, and preserve already saved result evidence.
 8. **Check history & evidence:** page through all saved runs, select previous results, archive/restore checks, review original evidence and baselines. Archived does not mean deleted.
 
 All eight detector IDs are included: `unexpected-charge`, `spike`, `gradual-creep`, `new-charge`, `usage-cost-mismatch`, `marketplace`, `expectation-mismatch` and `unused-commitment`. Relevant optional columns, usable history and expectations are required for their corresponding measurements. Unsupported evidence is unavailable, never a fabricated clean assessment.
@@ -68,7 +68,7 @@ CPU settings permit parallel work where the engine supports it; some stages rema
 To use another drive with more free space, choose trusted local directories at launch:
 
 ```sh
-commitops-local --data D:/CommitOpsData --work-dir D:/CommitOpsWork
+your-local-cost-explorer --data D:/CommitOpsData --work-dir D:/CommitOpsWork
 ```
 
 `--data` selects the retained-data directory; existing saved data remains in its original directory until you intentionally migrate it while the app is stopped. `--work-dir` selects disposable processing storage. The browser cannot submit filesystem paths.

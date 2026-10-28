@@ -244,7 +244,7 @@ class Handler(BaseHTTPRequestHandler):
                 if active and not active[1].is_alive():
                     con.execute("UPDATE runs SET status='interrupted',result=COALESCE(result,?) WHERE id=? AND status='running'",
                                 (json.dumps({'error': 'The analysis process stopped unexpectedly. Your operating system may have stopped it because of resource pressure. Check available memory/disk and retry. No complete result was saved.', 'reason': 'worker_interrupted'}), active[0]))
-                uploads = [{key: item[key] for key in ('id', 'name', 'bytes', 'role', 'sha256')} for (raw,) in con.execute('SELECT data FROM uploads') for item in [json.loads(raw)]]
+                uploads = [{key: item.get(key) for key in ('id', 'name', 'bytes', 'role', 'sha256', 'inspection')} for (raw,) in con.execute('SELECT data FROM uploads') for item in [json.loads(raw)]]
                 runs = [{'id': row[0], 'status': row[1], 'created': row[2]} for row in con.execute('SELECT id,status,created FROM runs ORDER BY created DESC LIMIT 100')]
                 self.respond(200, {'files': uploads, 'runs': runs, 'mappings': dict(con.execute('SELECT account,team FROM mappings'))})
             elif parsed.path.startswith('/api/runs/'):
@@ -299,10 +299,12 @@ class Handler(BaseHTTPRequestHandler):
             path.rename(final)
             path = final
             item = {'id': identifier, 'name': name, 'bytes': size, 'role': role, 'sha256': digest.hexdigest(), 'path': str(final)}
+            from local_dates import inspect
+            item['inspection'] = inspect(final)
             with database(self.server.root) as con:
                 con.execute('INSERT INTO uploads VALUES (?,?)', (identifier, json.dumps(item)))
             path = None
-            self.respond(201, {'id': identifier})
+            self.respond(201, {'id': identifier, 'inspection': item['inspection']})
         except (ValueError, OSError) as error:
             self.respond(400, {'error': str(error) if isinstance(error, ValueError) else 'Upload storage unavailable'})
         finally:
@@ -394,11 +396,52 @@ class Handler(BaseHTTPRequestHandler):
                 from datetime import date
                 from app.pipeline.types import DataWindow
                 DataWindow(**{key: date.fromisoformat(value[key]) for key in ('start', 'end', 'baseline_start', 'baseline_end')})
+                primary_ids = value.get('files')
+                if not isinstance(primary_ids, list) or not primary_ids or any(not isinstance(item, str) for item in primary_ids) or len(set(primary_ids)) != len(primary_ids):
+                    raise ValueError('Select distinct primary file identifiers')
+                mode = value.get('comparison_mode', 'history')
+                if mode not in ('history', 'device', 'previous'):
+                    raise ValueError('Invalid comparison mode')
                 with database(self.server.root) as con:
                     files = {identifier: json.loads(raw) for identifier, raw in con.execute('SELECT id,data FROM uploads')}
                     mappings = dict(con.execute('SELECT account,team FROM mappings'))
                     import manual_settings
                     value['_settings'] = manual_settings.settings(con)
+                baseline_ids = value.get('baseline_ids', [])
+                if not isinstance(baseline_ids, list) or any(not isinstance(identifier, str) for identifier in baseline_ids):
+                    raise ValueError('Invalid comparison files')
+                if mode != 'device' and baseline_ids or mode != 'previous' and value.get('comparison_check'):
+                    raise ValueError('Comparison source must match the chosen mode')
+                if value.get('comparison_mode') == 'device' and not baseline_ids:
+                    raise ValueError('Select comparison files')
+                previous = value.get('comparison_check')
+                if value.get('comparison_mode') == 'previous' and not previous:
+                    raise ValueError('Select a previous comparison check')
+                if previous:
+                    with database(self.server.root) as con:
+                        row = con.execute("SELECT r.result FROM runs r LEFT JOIN run_flags f ON f.run_id=r.id WHERE r.id=? AND r.status='completed' AND COALESCE(f.archived,0)=0", (previous,)).fetchone()
+                    if not row:
+                        raise ValueError('Previous comparison check unavailable')
+                    saved = json.loads(row[0])
+                    value['baseline_start'] = saved['window']['start']
+                    value['baseline_end'] = saved['window']['end']
+                    DataWindow(**{key: date.fromisoformat(value[key]) for key in ('start','end','baseline_start','baseline_end')})
+                    references = [item for item in saved.get('input_files', []) if item.get('role') == 'primary']
+                    if not references:
+                        raise ValueError('Previous check source identities unavailable; upload comparison files')
+                    for item in references:
+                        if item['id'] not in files or files[item['id']]['sha256'] != item['sha256']:
+                            raise ValueError('Retained comparison files missing or changed; upload them again')
+                    baseline_ids = [item['id'] for item in references]
+                if set(baseline_ids) & set(primary_ids):
+                    raise ValueError('The same source cannot supply primary and explicitly selected comparison data')
+                for identifier in baseline_ids:
+                    if identifier not in files:
+                        raise ValueError('Comparison file unavailable')
+                    files[identifier] = {**files[identifier], 'role': 'comparison'}
+                if any(identifier not in files or files[identifier]['role'] != 'primary' for identifier in primary_ids):
+                    raise ValueError('Primary files must be uploaded as primary data')
+                value['files'] = primary_ids + baseline_ids
                 selected = value.get('files')
                 if not isinstance(selected, list) or not selected or any(not isinstance(item, str) or item not in files for item in selected) or len(set(selected)) != len(selected):
                     raise ValueError('Select distinct uploaded file identifiers')

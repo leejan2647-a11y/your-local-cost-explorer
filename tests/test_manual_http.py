@@ -57,6 +57,54 @@ class ManualHTTPTests(unittest.TestCase):
             self.assertEqual(self.request('GET', path)[0], 404)
             self.assertEqual(self.request('POST', path, {})[0], 404)
 
+    def upload(self, name, raw, role='primary'):
+        connection=http.client.HTTPConnection('127.0.0.1',self.server.server_port,timeout=15)
+        connection.request('PUT','/api/upload?name='+name+'&role='+role,body=raw,headers={'X-Local-Token':self.server.token})
+        response=connection.getresponse();result=(response.status,json.loads(response.read()));connection.close()
+        return result
+
+    def test_real_upload_dates_and_legacy_state(self):
+        code,uploaded=self.upload('month.csv',b'lineItem/UsageStartDate\n2026-09-01\n2026-09-30')
+        self.assertEqual(code,201)
+        self.assertEqual(uploaded['inspection']['max_date'],'2026-09-30')
+        self.assertEqual(self.request('GET','/api/state')[1]['files'][0]['inspection'],uploaded['inspection'])
+        self.assertEqual(self.upload('../escape.csv',b'x')[0],400)
+        with local_app.database(self.root) as con:
+            con.execute('INSERT INTO uploads VALUES (?,?)',('legacy',json.dumps({'id':'legacy','name':'old.csv','role':'primary','bytes':1,'sha256':'a'*64})))
+        state=self.request('GET','/api/state')[1]
+        self.assertIsNone(next(f for f in state['files'] if f['id']=='legacy')['inspection'])
+        self.assertNotIn(str(self.root),json.dumps(state))
+
+    def test_explicit_comparison_provenance_dates_and_separation(self):
+        primary=self.upload('new.csv',b'lineItem/UsageStartDate\n2026-09-01\n2026-09-30')[1]['id']
+        previous=self.upload('old.csv',b'lineItem/UsageStartDate\n2026-08-01\n2026-08-31')[1]['id']
+        state=self.request('GET','/api/state')[1]
+        metadata=next(f for f in state['files'] if f['id']==previous)
+        saved={'window':{'start':'2026-08-01','end':'2026-08-31'},'input_files':[metadata]}
+        with local_app.database(self.root) as con:
+            con.execute('UPDATE runs SET result=? WHERE id=?',(json.dumps(saved),'run'))
+        received=[]
+        def process(**kwargs):
+            received.append(kwargs['args'])
+            return SimpleNamespace(start=lambda:None,is_alive=lambda:False)
+        body={'files':[primary],'comparison_mode':'previous','comparison_check':'run','start':'2026-09-01','end':'2026-09-30','baseline_start':'2026-07-01','baseline_end':'2026-07-31'}
+        with patch.object(local_app.multiprocessing,'get_context',return_value=SimpleNamespace(Process=process)):
+            self.assertEqual(self.request('POST','/api/analyse',body)[0],202)
+        request,files=received[0][2:4]
+        self.assertEqual((request['baseline_start'],request['baseline_end']),('2026-08-01','2026-08-31'))
+        self.assertEqual(files[primary]['role'],'primary');self.assertEqual(files[previous]['role'],'comparison')
+        self.assertEqual(next(f for f in self.request('GET','/api/state')[1]['files'] if f['id']==previous)['role'],'primary')
+        self.assertEqual(self.request('POST','/api/analyse',{**body,'files':[previous]})[0],400)
+        self.request('POST','/api/runs/archive',{'id':'run','archived':True})
+        self.assertEqual(self.request('POST','/api/analyse',body)[0],400)
+        self.request('POST','/api/runs/archive',{'id':'run','archived':False})
+        with local_app.database(self.root) as con:
+            raw=json.loads(con.execute('SELECT data FROM uploads WHERE id=?',(previous,)).fetchone()[0])
+        Path(raw['path']).write_bytes(b'changed')
+        self.assertEqual(self.request('POST','/api/analyse',body)[0],400)
+        self.assertEqual(self.request('POST','/api/analyse',{**body,'comparison_mode':'device','comparison_check':None,'baseline_ids':[]})[0],400)
+        self.assertEqual(self.request('POST','/api/analyse',{**body,'comparison_mode':'history'})[0],400)
+
     def test_source_removal_cannot_follow_substituted_paths(self):
         sentinel = self.root / 'preserve.txt'
         sentinel.write_text('private unchanged')

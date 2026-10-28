@@ -1,11 +1,9 @@
-# 0.3.0
+# 0.4.0 - Your Local Cost Explorer
 
-- Keep the local light palette/sidebar; align button names and manual page responsibilities with the main app.
-- Add general settings (company name, date defaults, creep sensitivity), team CRUD, saved multi-check report snapshots and local review/history workflows.
-- Keep connections, automatic discovery, schedules, rules, hosted accounts and delivery services absent.
-- Provision private Python and dependencies automatically on npm/source install, with first-launch recovery and immutable dependency-version runtimes.
-- Remove fixed per-file/combined-input, DuckDB memory and spill-size caps. Derive parallelism, memory and disk budgets from available hardware, preserving OS headroom.
-- Add explicit device-resource failures, resource visibility and trusted CLI storage selection.
-- Fix Windows SQLite handle closure. Preserve financial evidence and report snapshots during configuration/review changes.
+- Rename the public project and npm command to `your-local-cost-explorer`. Keep the existing private data/runtime directory so upgrading does not lose saved work.
+- Keep the local light design and sidebar. Remove Data Sources navigation; upload and retained-file controls appear only on Dashboard. Replace broken dash characters with `-`.
+- Inspect observed CUR dates locally for CSV, gzip and Parquet. Offer supported 7/30/90/180-day windows ending at the supplied data's latest date, with earlier rows as baseline. Missing history stays unavailable.
+- Put previous-check and device-file comparisons below the baseline fields. Retained comparisons verify original file hashes and cannot contaminate primary data.
+- Preserve all eight detectors, exact decimal financial calculations, commitments, allocation, settings and downloadable local reports. No hosted or automatic connections are included.
 
-Focused verification: Settings/report/team validation and snapshots; HTTP manual-only routes; mocked 5/6 GB admission without allocating large files; adaptive budgets and memory-pressure interruption; installer checksum/runtime isolation; dashboard navigation/filtering/evidence/escaping/exports; automatic Windows/Linux setup; a small CSV/gzip/Parquet exact financial control with adaptive parallelism. No large-file laptop stress test or unsupported capacity guarantee.
+Focused verification: real loopback uploads, CUR date aliases/formats/conflicts, calendar windows, previous-check provenance and separation, DOM upload/period/button behavior, small independent signed-charge/rounding ledger, duplicate removal, original eight-detector and commitment controls, hosted pricing withdrawal tests, frontend typecheck and production build. No large-file laptop stress test.

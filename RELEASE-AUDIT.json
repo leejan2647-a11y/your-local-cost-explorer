@@ -1,20 +1,15 @@
 {
-  "version": "0.3.0",
-  "package_sha256": "41bc69a7adc23348bcefb3e7a7436edf826da98a88b32026cba76511b715d0c2",
-  "audit": "allowlisted package/source; no hosted secrets, clients or parent history",
-  "design": "local light palette/sidebar; main-app names and manual behavior",
-  "manual_settings": "company name, default range, sensitivity and team CRUD",
-  "reports": "immutable single/multi-check snapshots; no summed overlapping totals",
-  "resources": "no fixed file or batch byte cap; available hardware with OS headroom",
+  "version": "0.4.0",
+  "name": "your-local-cost-explorer",
+  "package_sha256": "8246834e81fe95c4b04999cd67a4375818759ceb8f6d50ced1354798aa0a4923",
+  "audit": "allowlisted package and source; no hosted clients, secrets, private environment, records or parent history",
+  "financial_module_hashes": "unchanged",
   "verification": [
-    "Windows/Linux automatic setup",
-    "5/6GB declared admission mocked without large allocations",
-    "adaptive CPU/memory/spill and simulated pressure interruption",
-    "manual-only HTTP and settings/report controls",
-    "dashboard filters/evidence/escaping/CSV/HTML",
-    "small CSV/gzip/Parquet exact financial control with adaptive parallelism"
+    "real loopback upload and provenance tests",
+    "file-date and DOM comparison controls",
+    "independent signed-charge ledger across CSV/gzip/Parquet",
+    "original eight-detector and commitment controls"
   ],
-  "npm_registry": "public 0.3.0; integrity matches audited artifact; install with automatic setup passed",
-  "capacity_claim": "no arbitrary-file completion guarantee",
-  "verification_server": "Shutdown confirmed"
+  "scope": "manual local-only; hardware-derived budgets; no fixed commercial byte limits",
+  "hosted_server": "remained Shutdown; no deployment"
 }
