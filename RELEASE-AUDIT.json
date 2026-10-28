@@ -7,5 +7,7 @@
   "dashboard_tests": "navigation, cents, findings, escaped content passed",
   "hosted_connections": "none",
   "source": "fresh standalone repository with no parent Git history",
-  "package_install": "clean npm tarball installation passed"
+  "package_install": "clean npm tarball installation passed",
+  "github_archive_npm_install": "passed",
+  "npm_registry": "publisher 2FA required; GitHub npm installation works now"
 }

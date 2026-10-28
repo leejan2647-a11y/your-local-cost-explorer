@@ -4,8 +4,10 @@ An offline web app for AWS Cost and Usage Reports. Analyse files on your own dev
 
 ## Public installation
 
+This GitHub-backed npm install is available now and does not require an npm login. Registry publication under `commitops-local` is pending publisher-account 2FA. The package has no installation scripts that analyse billing data.
+
 ```sh
-npm install -g commitops-local
+npm install -g https://github.com/leejan2647-a11y/commitops-local/archive/refs/heads/main.tar.gz
 commitops-local --setup
 commitops-local
 ```
