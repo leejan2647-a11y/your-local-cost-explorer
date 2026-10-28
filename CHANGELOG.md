@@ -1,3 +1,7 @@
+# 0.4.1
+
+- Restore the selected device baseline when switching comparison modes. Respect the saved supported date-range preference and keep empty metric placeholders as `-`. Focused DOM regression passed.
+
 # 0.4.0 - Your Local Cost Explorer
 
 - Rename the public project and npm command to `your-local-cost-explorer`. Keep the existing private data/runtime directory so upgrading does not lose saved work.

@@ -26,7 +26,9 @@ test('upload, file-anchored periods, baseline controls and dashboard-only files'
   assert.equal($('baseline_start').value,'2026-08-01');assert.equal($('baseline_end').value,'2026-08-31');
   await $('analyse').onclick();assert.deepEqual(sent.files,['primary']);assert.deepEqual(sent.baseline_ids,['baseline']);assert.equal(sent.comparison_mode,'device');
   $('compare-history').click();assert.equal($('baseline_start').value,'2026-09-01');
+  $('compare-device').click();assert.equal($('baseline_start').value,'2026-08-01');assert.equal($('baseline_end').value,'2026-08-31');
   $('start').value='2026-09-26';$('start').dispatchEvent(new w.Event('input'));assert.equal($('period-choice').value,'manual');
+  files[0].inspection.min_date='2026-06-01';const selected=$('files').querySelector('input');selected.checked=false;selected.onchange();selected.checked=true;selected.onchange();assert.equal($('period-choice').value,'manual');assert.equal($('start').value,'2026-09-26');assert.deepEqual(Array.from($('period-choice').options,o=>o.value),['7','30','90','manual']);
   w.document.querySelector('[data-view=overview]').click();assert.equal($('upload').closest('section').hidden,false);
   for(const file of ['web/index.html','web/app.js'])assert(!/[\u00e2\u2014\u2013]/.test(fs.readFileSync(path.join(root,file),'utf8')));
  }finally{w.close();}

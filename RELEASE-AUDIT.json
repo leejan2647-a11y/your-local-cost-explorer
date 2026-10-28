@@ -1,7 +1,7 @@
 {
-  "version": "0.4.0",
+  "version": "0.4.1",
   "name": "your-local-cost-explorer",
-  "package_sha256": "8246834e81fe95c4b04999cd67a4375818759ceb8f6d50ced1354798aa0a4923",
+  "package_sha256": "306436448b958d95d94705cd102c5fbb981f5b66c115ab1a1004ee35d0589e72",
   "audit": "allowlisted package and source; no hosted clients, secrets, private environment, records or parent history",
   "financial_module_hashes": "unchanged",
   "verification": [
