@@ -11,5 +11,7 @@
     "original eight-detector and commitment controls"
   ],
   "scope": "manual local-only; hardware-derived budgets; no fixed commercial byte limits",
-  "hosted_server": "remained Shutdown; no deployment"
+  "npm_registry": "public 0.4.1; latest verified",
+  "npm_integrity": "matches audited tarball",
+  "github_release": "https://github.com/leejan2647-a11y/your-local-cost-explorer/releases/tag/v0.4.1"
 }
