@@ -451,6 +451,22 @@ def _conflict_queries(scope):
         , "SELECT "+ROW+", 'alias_conflict' FROM _commitops_candidates WHERE json_array_length(_commitops_aliases)>0")
 
 
+def _classification_bucket_count(con, candidate_count):
+    """Avoid partition setup for small, byte-bounded complete populations.
+
+    This only chooses work placement. Exact identity/payload comparisons and
+    every staging-integrity check still run. Larger or wide inputs retain the
+    existing partition count; payload strings never leave DuckDB for this probe.
+    """
+    if candidate_count > 1024 or CLASSIFICATION_BUCKETS == 1:
+        return CLASSIFICATION_BUCKETS
+    size = con.execute(
+        f"SELECT coalesce(sum(octet_length(encode(_commitops_payload))),0) "
+        f"FROM {RAW} WHERE _commitops_occurrence=0"
+    ).fetchone()[0]
+    return 1 if size <= PAYLOAD_STAGE_BYTES else CLASSIFICATION_BUCKETS
+
+
 def _classify_partitions(con):
     """Bound identity state without using hashes as observation identity.
 
@@ -468,6 +484,7 @@ def _classify_partitions(con):
     con.execute(f"CREATE OR REPLACE TEMP TABLE _commitops_repeated_ids ({ROW} BIGINT, _commitops_bucket INTEGER)")
     conflict_groups = 0
     expected_candidates = con.execute(f"SELECT count(*) FROM {RAW} WHERE _commitops_occurrence=0").fetchone()[0]
+    bucket_count = _classification_bucket_count(con, expected_candidates)
     staged_candidates = 0
     expected_repeated = {}
     with _classification_workspace(con, root) as working:
@@ -476,7 +493,7 @@ def _classify_partitions(con):
         _partition_copy(con,
             f"SELECT {ROW}, {scope}, _commitops_source, _commitops_aliases, "
             "CASE WHEN _commitops_identity='' THEN _commitops_payload ELSE NULL END AS _commitops_payload, "
-            f"hash(_commitops_role, CASE WHEN _commitops_identity!='' THEN _commitops_identity ELSE _commitops_payload END) % {CLASSIFICATION_BUCKETS} AS _commitops_bucket "
+            f"hash(_commitops_role, CASE WHEN _commitops_identity!='' THEN _commitops_identity ELSE _commitops_payload END) % {bucket_count} AS _commitops_bucket "
             f"FROM {RAW} WHERE _commitops_occurrence=0", metadata)
         buckets = sorted(metadata.glob("_commitops_bucket=*"))
         # Pass one groups only narrow metadata. Persist each bucket's small

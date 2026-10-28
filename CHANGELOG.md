@@ -1,3 +1,7 @@
+# 0.5.2
+
+Reduce redundant canonical partition setup for small byte-bounded inputs. Same-file SQL calls fell from 1151 to 207; stable financial results matched exactly. Large-input partitioning and multi-core budgets remain unchanged.
+
 # 0.5.1
 
 Fix Teams response contract; complete canonical history aliases and finding links, invalidate stale mappings; add customer documentation and 20% creep controls; make structured printable HTML the default report download. Financial detector, source-format and ledger controls passed. Bounded load probes stopped by safeguards; performance capacity remains unverified.

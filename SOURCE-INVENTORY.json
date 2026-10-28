@@ -21,8 +21,8 @@
   },
   {
     "file": "app/pipeline/canonical.py",
-    "upstream_sha256": "226c7502cdb5dd5d3cefe35cd0a447380a5b59b0a50568c4161eb941f7944497",
-    "export_sha256": "a740d00b4d315f698081d87e92b63a41876912d2a9fd6b29f38a9f8827e57aab"
+    "upstream_sha256": "ffb74e265b71163f9f9d31a2de76fec62d5f04d309a52cfa27c6894a3eaadfc9",
+    "export_sha256": "ffb74e265b71163f9f9d31a2de76fec62d5f04d309a52cfa27c6894a3eaadfc9"
   },
   {
     "file": "app/pipeline/commitments.py",
