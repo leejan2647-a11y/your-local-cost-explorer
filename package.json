@@ -1,0 +1,12 @@
+{
+  "name": "commitops-local",
+  "version": "0.2.0",
+  "repository": {"type":"git","url":"https://github.com/leejan2647-a11y/commitops-local.git"},
+  "homepage": "https://github.com/leejan2647-a11y/commitops-local#readme",
+  "description": "Offline AWS CUR charge analysis with a loopback web interface",
+  "license": "MIT",
+  "bin": {"commitops-local": "bin/commitops-local.cjs"},
+  "files": ["bin/*.cjs", "engine/**/*.py", "web/*.html", "web/*.js", "web/*.css", "requirements.txt", "SOURCE-INVENTORY.json", "README.md", "LICENSE"],
+  "scripts": {"start": "node bin/commitops-local.cjs", "setup": "node bin/commitops-local.cjs --setup"},
+  "engines": {"node": ">=20"}
+}
