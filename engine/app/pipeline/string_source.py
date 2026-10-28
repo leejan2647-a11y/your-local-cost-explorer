@@ -37,7 +37,12 @@ def values(reader, schema, encoder):
                 indices = [null_index if index is None else index
                            for index in dictionary.indices.to_pylist()]
                 columns[name] = (indices, entries)
-            compiled = [(encoder.keys[name] + ':', *columns[name]) for name in sorted(columns)]
+            # Compile a complete field once per dictionary entry, not once per
+            # row. Exact scalar JSON and field ordering stay unchanged. The
+            # dictionaries remain bounded by the existing 128-row batch.
+            compiled = [(columns[name][0],
+                         [encoder.keys[name] + ':' + entry[2] for entry in columns[name][1]])
+                        for name in sorted(columns)]
             identity = columns.get('identity/LineItemId')
             identity_text = [str(entry[0] or '').strip() for entry in identity[1]] if identity else None
             payer = columns.get('bill/PayerAccountId')
@@ -47,8 +52,8 @@ def values(reader, schema, encoder):
             end = columns.get('bill/BillingPeriodEndDate')
             periods = {None: 'null'}
             for index, ordinal in enumerate(batch.column(0).to_pylist()):
-                payload = '{' + ','.join(prefix + entries[indices[index]][2]
-                                         for prefix, indices, entries in compiled) + '}'
+                payload = '{' + ','.join(fragments[indices[index]]
+                                         for indices, fragments in compiled) + '}'
                 period_key = (start[0][index], end[0][index]) if start and end else None
                 if period_key not in periods:
                     first, last = start[1][period_key[0]][1], end[1][period_key[1]][1]

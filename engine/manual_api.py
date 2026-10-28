@@ -18,6 +18,7 @@ def now(): return datetime.now(timezone.utc).isoformat()
 def initialise(con):
     con.executescript('''CREATE TABLE IF NOT EXISTS local_labels(id TEXT PRIMARY KEY,run_id TEXT NOT NULL REFERENCES runs(id),finding_id TEXT NOT NULL,label TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS local_submissions(key TEXT PRIMARY KEY,request TEXT NOT NULL,run_id TEXT NOT NULL REFERENCES runs(id));
+    CREATE INDEX IF NOT EXISTS local_labels_run ON local_labels(run_id,finding_id);
     CREATE TABLE IF NOT EXISTS local_history_reports(id TEXT PRIMARY KEY,created TEXT NOT NULL,document TEXT NOT NULL);''')
 
 
@@ -60,12 +61,15 @@ def plans(run):
 def findings(con,run):
     if run['status']!='completed':return []
     updates=manual_store.updates(con,run['id']);teams=dict(con.execute('SELECT account,team FROM mappings'));output=[]
+    labels=defaultdict(list)
+    for finding_id,label_id,label in con.execute('SELECT finding_id,id,label FROM local_labels WHERE run_id=?',(run['id'],)):
+        labels[finding_id].append((label_id,label))
     for item in run['result'].get('findings',[]):
         fid=run['id']+':'+item['id'];u=updates.get(item['id'],{});e=item.get('evidence') or {};rows=[]
         for i,row in enumerate(e.get('top_line_items',[])):
             rows.append({'id':str(i),'finding_id':fid,'row_reference':str(row.get('row_reference',row.get('rowReference',row.get('line_item_id',i)))),'amount_cents':row.get('amount_cents',row.get('contribution_cents')),'raw_cost_cents':row.get('raw_cost_cents'),'usage_date':row.get('usage_date')})
         m=item.get('amount_measurement');impact=m.get('value_cents') if m else None
-        output.append({**item,'id':fid,'detector_type':item['type'],'subject':item.get('service') or item['title'],'impact_cents':impact,'amount_measurement':m,'impact_basis':(m or {}).get('basis'),'evidence_total_cents':int(Decimal(e['evidence_total'])*100) if e.get('evidence_total') is not None else None,'evidence':rows,'evidence_measurement':None,'attribution':item.get('stats',{}).get('resourceAttribution'),'aws_account_id':item.get('account') or None,'team_name':teams.get(item.get('account')),'check_id':run['id'],'check_created_at':run['created'],'check_window_start':run['result'].get('window',{}).get('start'),'check_window_end':run['result'].get('window',{}).get('end'),'state':{'finding_id':fid,'status':'archived' if u.get('archived') else u.get('status','open'),'note':u.get('note',''),'updated_at':run['created']},'labels':[{'id':a,'finding_id':fid,'label':b,'created_at':run['created']} for a,b in con.execute('SELECT id,label FROM local_labels WHERE run_id=? AND finding_id=?',(run['id'],item['id']))]})
+        output.append({**item,'id':fid,'detector_type':item['type'],'subject':item.get('service') or item['title'],'impact_cents':impact,'amount_measurement':m,'impact_basis':(m or {}).get('basis'),'evidence_total_cents':int(Decimal(e['evidence_total'])*100) if e.get('evidence_total') is not None else None,'evidence':rows,'evidence_measurement':None,'attribution':item.get('stats',{}).get('resourceAttribution'),'aws_account_id':item.get('account') or None,'team_name':teams.get(item.get('account')),'check_id':run['id'],'check_created_at':run['created'],'check_window_start':run['result'].get('window',{}).get('start'),'check_window_end':run['result'].get('window',{}).get('end'),'state':{'finding_id':fid,'status':'archived' if u.get('archived') else u.get('status','open'),'note':u.get('note',''),'updated_at':run['created']},'labels':[{'id':a,'finding_id':fid,'label':b,'created_at':run['created']} for a,b in labels[item['id']]]})
     return output
 
 

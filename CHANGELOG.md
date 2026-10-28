@@ -1,3 +1,7 @@
+# 0.5.3
+
+Reuse exact encoded field fragments within bounded batches; reduce scalar identity lookups. Read history checks and labels once per page and batch resource aliases. Preserve financial results and per-request artifact verification.
+
 # 0.5.2
 
 Reduce redundant canonical partition setup for small byte-bounded inputs. Same-file SQL calls fell from 1151 to 207; stable financial results matched exactly. Large-input partitioning and multi-core budgets remain unchanged.

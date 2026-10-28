@@ -1,6 +1,6 @@
 {
-  "version": "0.5.2",
-  "package_sha256": "89d763a955af26dcf9d7036a68f39ff457446e79c15636e559a6e6a14976b982",
+  "version": "0.5.3",
+  "package_sha256": "74428b0df69df3ca25f72a9bf3ac0c58a9e80264f0606247c2b096d1dbc9f8b4",
   "audit": "No hosted app endpoints, credentials, private records, environment files or parent Git history in package.",
   "verification": [
     "Exact-cent manual API contracts",

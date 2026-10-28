@@ -181,18 +181,24 @@ def _record_components(raw, schema):
         else:
             fields[name] = value
             encoded_fields[name] = encoded
-    def supplied(name):
-        for key, value in values.items():
-            resolved = encoder.names[key] if key in encoder.names else canonical_column(key, types)
-            if resolved == name:
-                return value
-        return None
-    identifier = str(supplied("identity/LineItemId") or "").strip()
+    # Find both raw identity fields in one pass. First-supplied precedence
+    # (including an explicitly supplied null) must match the reference path.
+    missing = object()
+    raw_identifier = payer = missing
+    for key, value in values.items():
+        resolved = encoder.names[key] if key in encoder.names else canonical_column(key, types)
+        if resolved == "identity/LineItemId" and raw_identifier is missing:
+            raw_identifier = value
+        elif resolved == "bill/PayerAccountId" and payer is missing:
+            payer = value
+        if raw_identifier is not missing and payer is not missing:
+            break
+    identifier = str((None if raw_identifier is missing else raw_identifier) or "").strip()
     bounds = [fields.get(k) for k in ("bill/BillingPeriodStartDate", "bill/BillingPeriodEndDate")]
     partition = [v[1] for v in bounds] if all(v and v[0] == "instant" for v in bounds) else None
     if partition and partition[0] >= partition[1]:
         partition = None
-    payer = supplied("bill/PayerAccountId")
+    payer = None if payer is missing else payer
     payer = str(payer).strip() if payer is not None else None
     # Match json.dumps(sort_keys=True, separators=(',', ':')) byte for byte,
     # reusing only independently encoded, immutable scalar representations.

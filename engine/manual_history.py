@@ -103,23 +103,42 @@ def breakdown(con,identifier,q):
   cte=f'WITH scoped AS (SELECT * FROM history WHERE {where}), grouped AS (SELECT {columns},{label} AS label,sum(amount_cents)::BIGINT AS amount_cents,list_distinct(list(account_id)) AS account_ids FROM scoped GROUP BY {columns}) '
   search=q.get('search','');count=db.execute(cte+'SELECT count(*) FROM grouped WHERE strpos(lower(label),lower(?))>0',params+[search]).fetchone()[0]
   cursor=db.execute(cte+'SELECT * FROM grouped WHERE strpos(lower(label),lower(?))>0 ORDER BY '+orders[sort]+','+columns+' LIMIT ? OFFSET ?',params+[search,limit,offset]);names=[r[0] for r in cursor.description];rows=[]
-  for values in cursor.fetchall():
-   item=dict(zip(names,values));child=criteria+[{k:item[k] for k in fields if k!='team_label'}];token=next((k for k,v in doc['_tokens'].items() if v==child),None) or str(uuid4());doc['_tokens'][token]=child
-   aliases=[]
-   if group=='resources':
+  groups=[dict(zip(names,values)) for values in cursor.fetchall()]
+  page_aliases={}
+  if group=='resources' and len(groups)>3:
+   db.execute('CREATE TABLE alias_page(page_index INTEGER,account_id VARCHAR,service VARCHAR,region VARCHAR,resource_id VARCHAR)')
+   db.executemany('INSERT INTO alias_page VALUES (?,?,?,?,?)',[(index,item['account_id'],item['service'],item['region'],item['resource_id']) for index,item in enumerate(groups)])
+   observations=db.execute("WITH observations AS (SELECT page_index,date,unnest(names) AS alias FROM history JOIN alias_page USING(account_id,service,region,resource_id) WHERE "+where+"), grouped AS (SELECT page_index,alias,min(date) AS first,max(date) AS last FROM observations GROUP BY page_index,alias) SELECT * FROM grouped QUALIFY row_number() OVER(PARTITION BY page_index ORDER BY alias)<=101 ORDER BY page_index,alias",params).fetchall()
+   for index,name,first,last in observations:
+    page_aliases.setdefault(index,[]).append({'name':name,'start':str(first),'end':str(last)})
+  for index,item in enumerate(groups):
+   child=criteria+[{k:item[k] for k in fields if k!='team_label'}];token=next((k for k,v in doc['_tokens'].items() if v==child),None) or str(uuid4());doc['_tokens'][token]=child
+   aliases=page_aliases.get(index,[])
+   if group=='resources' and len(groups)<=3:
     filters=' AND '.join(k+'=?' for k in ('account_id','service','region','resource_id'))
     observations=db.execute("WITH x AS (SELECT date,unnest(names) AS name FROM history WHERE "+where+' AND '+filters+") SELECT name,min(date),max(date) FROM x GROUP BY name ORDER BY name LIMIT 101",params+[item[k] for k in ('account_id','service','region','resource_id')]).fetchall()
     aliases=[{'name':n,'start':str(start),'end':str(end)} for n,start,end in observations]
    finding_ids=[]
-   if group in {'teams','accounts','services'} and not any(set(c)&{'resource_id','principal_arn','region'} for c in criteria):
-    import manual_api
-    for check_id in doc['check_ids']:
-     for finding in manual_api.findings(con,manual_api.load(con,check_id)):
-      if finding['aws_account_id'] not in item['account_ids']:continue
-      services=[c['service'] for c in criteria if 'service' in c]+([item['service']] if group=='services' else [])
-      if any(finding['service']!=service for service in services):continue
-      if len(finding_ids)<100:finding_ids.append(finding['id'])
    rows.append({**item,'scope_id':token,'percent':round(item['amount_cents']*100/total,4) if total>0 else None,'names':[a['name'] for a in aliases[:100]],'aliases':aliases[:100],'aliases_has_more':len(aliases)>100,'finding_ids':finding_ids})
+
+ # Read each check and its labels once per page, then route findings to page
+ # groups. Retain at most the existing 100 associations per displayed row;
+ # do not keep a cross-request cache that could hide edited state or sources.
+ if group in {'teams','accounts','services'} and not any(set(c)&{'resource_id','principal_arn','region'} for c in criteria):
+  import manual_api
+  by_account={}
+  for index,row in enumerate(rows):
+   for account in row['account_ids']:by_account.setdefault(account,[]).append(index)
+  services=[c['service'] for c in criteria if 'service' in c]
+  if rows:
+   for check_id in doc['check_ids']:
+    run=manual_api.load(con,check_id)
+    for finding in manual_api.findings(con,run):
+     if any(finding['service']!=service for service in services):continue
+     for index in by_account.get(finding['aws_account_id'],[]):
+      row=rows[index]
+      if group=='services' and finding['service']!=row['service']:continue
+      if len(row['finding_ids'])<100:row['finding_ids'].append(finding['id'])
 
  con.execute('UPDATE local_history_reports SET document=? WHERE id=?',(json.dumps(doc),identifier))
  return {'report_id':identifier,'group_by':group,'scope_id':scope,'rows':rows,'total_cents':total,'count':count,'offset':offset,'limit':limit,'has_more':offset+len(rows)<count,'coverage':doc['coverage'],'reasons':doc['reasons']}
