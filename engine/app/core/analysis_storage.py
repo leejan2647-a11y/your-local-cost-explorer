@@ -12,7 +12,6 @@ import stat
 import threading
 from duckdb import ConnectionException, Error as DuckDBError
 
-DISK_RESERVE = 8 * 1024**3
 
 
 class AnalysisStorageError(OSError):
@@ -80,13 +79,15 @@ def reap_orphans(root):
 
 
 class AnalysisConnection:
-    def __init__(self, connection, working, lease):
+    def __init__(self, connection, working, lease, *, disk_reserve=0, memory_reserve=0):
         self._connection = connection
         self._working = working
         self._lease = lease
         self._stop = threading.Event()
         self._storage_failed = False
         self._closed = False
+        self._disk_reserve = disk_reserve
+        self._memory_reserve = memory_reserve
         self._cursors = set()
         self._cursor_lock = threading.Lock()
         self._monitor = threading.Thread(target=self._watch_storage, name='analysis-storage-guard', daemon=True)
@@ -100,7 +101,9 @@ class AnalysisConnection:
                 free = 0
             if self._stop.is_set():
                 return
-            if free < DISK_RESERVE:
+            from local_hardware import memory
+            available, _ = memory()
+            if free < self._disk_reserve or available < self._memory_reserve//2:
                 self._storage_failed = True
                 with self._cursor_lock:
                     connections = [self._connection, *self._cursors]
@@ -115,7 +118,7 @@ class AnalysisConnection:
         if self._closed:
             raise ConnectionException('Analysis connection is closed')
         if self._storage_failed:
-            raise AnalysisStorageError('Insufficient private analysis working storage')
+            raise AnalysisStorageError('Your device has insufficient available memory or working disk to continue safely')
 
     def _new_cursor(self, source):
         with self._cursor_lock:
@@ -218,7 +221,7 @@ def connect(settings):
     root=Path(gettempdir()) / ('commitops-local-analysis-' + str(os.getuid() if hasattr(os,'getuid') else 'local'))
     with _root_lock(root):
         _reap_locked(root)
-        if shutil.disk_usage(root).free < DISK_RESERVE:
+        if shutil.disk_usage(root).free <= settings.disk_reserve:
             raise AnalysisStorageError('Insufficient private analysis working storage')
         working = TemporaryDirectory(prefix='job-', dir=root)
         lease=(Path(working.name)/'.lease').open('w+b')
@@ -230,11 +233,13 @@ def connect(settings):
             "autoload_known_extensions": False,
             "threads": settings.duckdb_threads,
             "memory_limit": settings.duckdb_memory_limit,
-            "max_temp_directory_size": "1GB",
+            "max_temp_directory_size": settings.duckdb_spill_limit,
             "temp_directory": working.name,
         })
     except BaseException:
         lease.close()
         working.cleanup()
         raise
-    return AnalysisConnection(connection, working, lease)
+    wrapper = AnalysisConnection(connection, working, lease, disk_reserve=settings.disk_reserve, memory_reserve=settings.memory_reserve)
+    wrapper.hardware = dict(settings.hardware)
+    return wrapper

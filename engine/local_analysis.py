@@ -51,9 +51,17 @@ def analyse(request, files, mappings):
         if parsed is not None and (not parsed.is_finite() or parsed != parsed.to_integral_value() or abs(parsed) > 2**53-1):
             raise ValueError('Expected amounts require finite exact cents')
         expectations.append(ServiceExpectation(str(item['service'])[:255], str(item.get('note', ''))[:4096], None if parsed is None else int(parsed), parsed is None))
-    result = run_check(primary, window, 'local', baseline_sources=baseline or None, expectations=expectations,
-                       as_of=datetime.now(timezone.utc).date(), growth_sources=sources, growth_as_of=datetime.now(timezone.utc))
+    from app.core.resources import analysis_connection
+    with analysis_connection() as con:
+        resource_budget = dict(con.hardware)
+        result = run_check(primary, window, 'local', baseline_sources=baseline or None, expectations=expectations,
+                           as_of=datetime.now(timezone.utc).date(), growth_sources=sources, growth_as_of=datetime.now(timezone.utc), con=con,
+                           creep_monthly_growth_percent=request.get('_settings', {}).get('creepMonthlyGrowthPercent', '10'))
     output = serial(result)
+    output['workspace_settings'] = dict(request.get('_settings', {}))
+    output['resource_budget'] = resource_budget
+    output['commitments'] = [{**serial(item), 'unused_cents': item.unused_cents}
+                             for item in getattr(result, 'commitments', [])]
     # Team attribution joins only observed allocation; unknown consumption stays unknown.
     allocation = result.allocation.to_dict() if result.allocation is not None else None
     output['allocation'] = serial(allocation)

@@ -1,13 +1,9 @@
-# Local dashboard design
+# Local manual dashboard
 
-The dashboard uses a white navigation sidebar, slate text (#263445), a pale workspace (#f6f7fb), restrained blue actions (#4165cf), system typography, and left-aligned financial tables. Summary cards show evidence-supported values only. Unknown is not zero. Mobile navigation scrolls horizontally; keyboard focus and reduced-motion preferences are supported.
+The local edition keeps its own light workspace, white sidebar, slate text (#263445), blue controls (#4165cf) and rectangular cards. It deliberately does not reuse the main app's dark Flow palette, horizontal navigation or pill-shaped toolbar.
 
-References queried using the owner's installed local MCP servers:
+The main app supplies button labels and page responsibilities: Dashboard, Check Charges, Findings, Commitments, Allocation, Reports, Data Sources and Settings. Manual behavior includes evidence, baselines, local review statuses/notes, archive/restore, named report snapshots and general/team preferences. Connections, authentication, billing and automatic workflows are absent.
 
-- Tyler Forge: application-layout three-panel and table-with-filters blocks.
-- Magic UI: Blur Fade component discovery; decorative entrance effects were unnecessary for dense billing evidence.
-- Uiverse: Buttons category and hover-button listings.
+Settings support company name, default date range, detector sensitivity, team CRUD, documentation and hardware visibility. Check snapshots preserve the settings/mappings used at calculation time. Reports never send automatically.
 
-These were design references, not vendored code. HTML/CSS and the native button transitions are original. No runtime library, CDN, provider login or remote asset is required. Reference tools were accessible without additional login.
-
-The financial engine is unchanged in this release. Focused dashboard verification checks navigation, exact cent display, actual finding rows and escaped untrusted text. Completed results are not polled repeatedly; stale responses cannot replace the newly selected result.
+Original HTML/CSS/JS is bundled without CDN assets or copied library code. Earlier Forge, Magic UI and Uiverse reference queries inform accessible native control patterns only. Device-derived budgets replace fixed input-size caps; no hardware capacity claim is made for arbitrary files.

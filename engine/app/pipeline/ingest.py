@@ -449,20 +449,15 @@ def ingest_many(
         log.exception("processing resources exhausted while reading billing input")
         return IngestResult(
             TABLE, 0, frozenset(), label,
-            error=(
-                "Analysis exceeded available processing resources. Retry with a smaller export "
-                "covering fewer complete billing periods, keeping related commitment and usage "
-                "records together, or ask the operator to review worker capacity."
-            ),
+            error="Your device could not complete this analysis with its available memory.",
+            diagnostics={'code': 'device_memory', 'message': 'Insufficient available device memory', 'recovery': 'Close other applications or use a device with more available memory, then retry.'},
         )
     except (canonical.PayloadStagingError, AnalysisStorageError):
         log.exception("temporary processing storage unavailable while reading billing input")
         return IngestResult(
             TABLE, 0, frozenset(), label,
-            error=(
-                "Analysis could not use temporary processing storage. Ask the operator to check "
-                "available disk space and storage permissions, then retry the original export."
-            ),
+            error="Your device could not use the required temporary processing storage. Check free disk and permissions, or choose another working drive.",
+            diagnostics={'code': 'device_storage', 'message': 'Device working storage unavailable', 'recovery': 'Free disk space or select another working drive, then retry.'},
         )
     except (duckdb.Error, ValueError, OSError, csv.Error):
         log.exception("failed to read billing input")

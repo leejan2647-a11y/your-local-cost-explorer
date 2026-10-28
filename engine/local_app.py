@@ -15,9 +15,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
 from uuid import uuid4
+from contextlib import contextmanager
 
-MAX_UPLOAD = 2_000_000_000
-RESERVE = 8 * 1024**3
 WEB = Path(__file__).resolve().parents[1] / 'web'
 
 
@@ -30,11 +29,16 @@ def deny_outbound():
     socket.getaddrinfo = refused
 
 
+@contextmanager
 def database(root):
     con = sqlite3.connect(root / 'local.sqlite3', timeout=5)
-    con.execute('PRAGMA foreign_keys=ON')
-    con.execute('PRAGMA journal_mode=WAL')
-    return con
+    try:
+        con.execute('PRAGMA foreign_keys=ON')
+        con.execute('PRAGMA journal_mode=WAL')
+        with con:
+            yield con
+    finally:
+        con.close()
 
 
 def data_lease(root):
@@ -72,7 +76,12 @@ def initialise(root):
         CREATE TABLE IF NOT EXISTS runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, result TEXT, created TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS mappings (account TEXT PRIMARY KEY, team TEXT NOT NULL);
         ''')
-        con.execute("UPDATE runs SET status='interrupted' WHERE status='running'")
+        con.execute("UPDATE runs SET status='interrupted',result=COALESCE(result,?) WHERE status='running'",
+                    (json.dumps({'error': 'The previous analysis stopped before completion. Check available memory and disk, then retry. No complete result was saved.', 'reason': 'worker_interrupted'}),))
+        import manual_store
+        manual_store.initialise(con)
+        import manual_settings
+        manual_settings.initialise(con)
     for part in (root / 'uploads').glob('*.part'):
         part.unlink()
 
@@ -85,7 +94,10 @@ def job(root, run_id, request, files, mappings):
         status = 'completed'
     except BaseException as error:
         # Engine diagnostic text may contain a local storage path. Keep failure private.
-        result = json.dumps({'error': 'Analysis could not complete. Check CUR format, dates, input columns and available disk/memory.', 'type': type(error).__name__})
+        diagnostics = getattr(error, 'diagnostics', None) or {}
+        resource_failure = type(error).__name__ in {'MemoryError', 'ArrowMemoryError', 'OutOfMemoryException', 'AnalysisStorageError'} or diagnostics.get('code') in {'device_memory', 'device_storage'} or 'no space left' in str(error).lower()
+        message = ('Your device could not complete this check with its available memory or disk. Close other apps or use a drive with more free space, then retry. No complete result was saved.' if resource_failure else 'Analysis could not complete. Check CUR format, dates, input columns and available disk/memory.')
+        result = json.dumps({'error': message, 'type': type(error).__name__, 'reason': 'device_resources' if resource_failure else 'analysis_failed'})
         status = 'failed'
     with database(root) as con:
         con.execute("UPDATE runs SET status=?, result=? WHERE id=? AND status='running'", (status, result, run_id))
@@ -157,7 +169,10 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return True
 
-    def body(self, limit=65536):
+    def body(self, limit=None, *, hardware=False):
+        if limit is None:
+            import local_hardware
+            limit = max(65536, local_hardware.memory()[0]//100)  # Keep small cancellation/control requests usable under pressure.
         if self.headers.get('Transfer-Encoding'):
             raise ValueError('Chunked transfer is unsupported')
         values = self.headers.get_all('Content-Length', [])
@@ -165,7 +180,7 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError('A single exact content length is required')
         size = int(values[0])
         if size > limit:
-            raise ValueError('Request exceeds the size limit')
+            raise ValueError('Your device currently has insufficient free disk for this file' if hardware else 'Your device has insufficient available memory for this request')
         return size
 
     def read_json(self):
@@ -179,6 +194,15 @@ class Handler(BaseHTTPRequestHandler):
         return value
 
     def do_GET(self):
+        try:
+            self._get()
+        except (sqlite3.Error, MemoryError, OSError, ValueError):
+            try:
+                self.respond(503, {'error': 'Your device could not read local data or resource information. Check available memory/disk and retry.'})
+            except OSError:
+                pass
+
+    def _get(self):
         parsed = urlsplit(self.path)
         if parsed.path in ('/', '/app.js', '/style.css'):
             if not self.guard(False):
@@ -189,10 +213,37 @@ class Handler(BaseHTTPRequestHandler):
         if not self.guard():
             return
         with database(self.server.root) as con:
+            if parsed.path == '/api/resources':
+                import local_hardware
+                from tempfile import gettempdir
+                self.respond(200, {'processing': local_hardware.budget(gettempdir()), 'uploads': local_hardware.disk(self.server.root), 'notice': 'No fixed file-size or batch-byte cap. Available hardware can prevent completion; compressed size does not predict processing needs.'})
+                return
+            if parsed.path in {'/api/settings', '/api/reports'} or parsed.path.startswith('/api/reports/'):
+                import manual_settings
+                try:
+                    if parsed.path == '/api/settings':
+                        data = {'settings': manual_settings.settings(con), 'teams': dict(con.execute('SELECT account,team FROM mappings'))}
+                    elif parsed.path == '/api/reports':
+                        data = manual_settings.reports(con, parse_qs(parsed.query).get('before', [None])[0])
+                    else:
+                        data = manual_settings.report(con, parsed.path.removeprefix('/api/reports/'))
+                    self.respond(200, data)
+                except (ValueError, TypeError):
+                    self.respond(400, {'error': 'Requested local settings or report unavailable'})
+                return
+            if parsed.path == '/api/history':
+                import manual_store
+                try:
+                    query = parse_qs(parsed.query)
+                    self.respond(200, manual_store.history(con, query.get('before', [None])[0], int(query.get('limit', ['50'])[0])))
+                except ValueError:
+                    self.respond(400, {'error': 'Invalid history cursor or page size'})
+                return
             if parsed.path == '/api/state':
                 active = self.server.active
                 if active and not active[1].is_alive():
-                    con.execute("UPDATE runs SET status='interrupted' WHERE id=? AND status='running'", (active[0],))
+                    con.execute("UPDATE runs SET status='interrupted',result=COALESCE(result,?) WHERE id=? AND status='running'",
+                                (json.dumps({'error': 'The analysis process stopped unexpectedly. Your operating system may have stopped it because of resource pressure. Check available memory/disk and retry. No complete result was saved.', 'reason': 'worker_interrupted'}), active[0]))
                 uploads = [{key: item[key] for key in ('id', 'name', 'bytes', 'role', 'sha256')} for (raw,) in con.execute('SELECT data FROM uploads') for item in [json.loads(raw)]]
                 runs = [{'id': row[0], 'status': row[1], 'created': row[2]} for row in con.execute('SELECT id,status,created FROM runs ORDER BY created DESC LIMIT 100')]
                 self.respond(200, {'files': uploads, 'runs': runs, 'mappings': dict(con.execute('SELECT account,team FROM mappings'))})
@@ -202,7 +253,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not row:
                     self.respond(404, {'error': 'Run unavailable'})
                 else:
-                    self.respond(200, {'status': row[0], 'result': json.loads(row[1]) if row[1] else None})
+                    import manual_store
+                    self.respond(200, {'status': row[0], 'result': json.loads(row[1]) if row[1] else None, 'finding_updates': manual_store.updates(con, run_id)})
             else:
                 self.respond(404, {'error': 'Unknown route'})
 
@@ -218,14 +270,16 @@ class Handler(BaseHTTPRequestHandler):
             return
         path = None
         try:
-            size = self.body(MAX_UPLOAD)
+            import local_hardware
+            capacity = local_hardware.disk(self.server.root)
+            size = self.body(capacity['usable_bytes'], hardware=True)
             query = parse_qs(parsed.query)
             name = query.get('name', [''])[0]
             role = query.get('role', ['primary'])[0]
             if role not in ('primary', 'comparison') or not name or len(name) > 512 or '/' in name or '\\' in name or not name.lower().endswith(('.csv', '.csv.gz', '.parquet')):
                 raise ValueError('Choose a local CSV, CSV.gz or Parquet file and a valid role')
-            if shutil.disk_usage(self.server.root).free < RESERVE + size:
-                raise ValueError('Insufficient disk: preserve 8 GiB free working space')
+            if size > local_hardware.disk(self.server.root)['usable_bytes']:
+                raise ValueError('Your device does not have enough free disk for this upload. Choose another drive or free space, then retry.')
             identifier = str(uuid4())
             suffix = '.parquet' if name.lower().endswith('.parquet') else '.csv.gz' if name.lower().endswith('.gz') else '.csv'
             path = self.server.root / 'uploads' / (identifier + suffix + '.part')
@@ -239,6 +293,8 @@ class Handler(BaseHTTPRequestHandler):
                     stream.write(chunk)
                     digest.update(chunk)
                     remaining -= len(chunk)
+                    if shutil.disk_usage(self.server.root).free < capacity['reserve_bytes']:
+                        raise ValueError('Upload stopped because your device is running low on free disk. No partial upload was saved.')
             final = path.with_suffix('')
             path.rename(final)
             path = final
@@ -262,6 +318,52 @@ class Handler(BaseHTTPRequestHandler):
             with self.server.operation_lock:
                 active = self.server.active
                 running = active is not None and active[1].is_alive()
+                if self.path in {'/api/settings', '/api/settings/teams', '/api/reports/update'}:
+                    import manual_settings
+                    try:
+                        with database(self.server.root) as con:
+                            if self.path == '/api/settings':
+                                data = manual_settings.save_settings(con, value)
+                            elif self.path == '/api/settings/teams':
+                                manual_settings.save_team(con, value)
+                                data = {'saved': True}
+                            else:
+                                data = manual_settings.update_report(con, value)
+                    except ValueError as error:
+                        self.respond(400, {'error': str(error)})
+                        return
+                    self.respond(200, data)
+                    return
+                if self.path == '/api/findings/update':
+                    import manual_store
+                    with database(self.server.root) as con:
+                        manual_store.update_finding(con, value)
+                    self.respond(200, {'saved': True})
+                    return
+                if self.path == '/api/runs/archive':
+                    if type(value.get('archived')) is not bool:
+                        raise ValueError('Invalid archive state')
+                    with database(self.server.root) as con:
+                        row = con.execute('SELECT status FROM runs WHERE id=?', (value.get('id'),)).fetchone()
+                        if not row or row[0] == 'running':
+                            raise ValueError('Only finished runs can be archived')
+                        con.execute('INSERT INTO run_flags VALUES (?,?) ON CONFLICT(run_id) DO UPDATE SET archived=excluded.archived', (value['id'], int(value['archived'])))
+                    self.respond(200, {'saved': True})
+                    return
+                if self.path == '/api/files/remove':
+                    if running:
+                        raise ValueError('Wait for the active analysis before removing source files')
+                    with database(self.server.root) as con:
+                        row = con.execute('SELECT data FROM uploads WHERE id=?', (value.get('id'),)).fetchone()
+                        if not row:
+                            raise ValueError('File unavailable')
+                        source = Path(json.loads(row[0])['path'])
+                        if source.is_symlink() or source.resolve().parent != (self.server.root / 'uploads').resolve():
+                            raise ValueError('Unsafe retained source')
+                        con.execute('DELETE FROM uploads WHERE id=?', (value['id'],))
+                    source.unlink(missing_ok=True)
+                    self.respond(200, {'removed': True, 'saved_results_preserved': True})
+                    return
                 if self.path == '/api/cancel':
                     if running:
                         active[1].terminate()
@@ -295,11 +397,11 @@ class Handler(BaseHTTPRequestHandler):
                 with database(self.server.root) as con:
                     files = {identifier: json.loads(raw) for identifier, raw in con.execute('SELECT id,data FROM uploads')}
                     mappings = dict(con.execute('SELECT account,team FROM mappings'))
+                    import manual_settings
+                    value['_settings'] = manual_settings.settings(con)
                 selected = value.get('files')
                 if not isinstance(selected, list) or not selected or any(not isinstance(item, str) or item not in files for item in selected) or len(set(selected)) != len(selected):
                     raise ValueError('Select distinct uploaded file identifiers')
-                if sum(files[item]['bytes'] for item in selected) > MAX_UPLOAD:
-                    raise ValueError('This device-safe edition permits 2 GB combined input per check')
                 for identifier in selected:
                     item = files[identifier]
                     path = Path(item['path'])
@@ -325,7 +427,14 @@ def main():
     parser = argparse.ArgumentParser(description='Offline local AWS billing analysis')
     parser.add_argument('--port', type=int, default=8080)
     parser.add_argument('--data', type=Path, default=Path.home() / '.commitops-local')
+    parser.add_argument('--work-dir', type=Path, help='Trusted local CLI choice for processing storage on another drive')
     args = parser.parse_args()
+    if args.work_dir:
+        import tempfile
+        if args.work_dir.is_symlink():
+            parser.error('Working directory cannot be a symbolic link')
+        args.work_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        tempfile.tempdir = str(args.work_dir.resolve())
     if args.data.is_symlink():
         parser.error('Data directory cannot be a symbolic link')
     root = args.data.resolve()
