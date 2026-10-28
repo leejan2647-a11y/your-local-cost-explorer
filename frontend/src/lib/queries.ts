@@ -652,7 +652,7 @@ export function useTeams(): UseQueryResult<Team[]> {
   const { apiFetch } = usePrivateApi()
   return useQuery({
     queryKey: keys.teams.root,
-    queryFn: ({ signal }) => apiFetch<{ teams: Team[] }>('/api/teams', { signal }).then((b) => b.teams),
+    queryFn: ({ signal }) => apiFetch<Team[]>('/api/teams', { signal }),
   })
 }
 
@@ -932,13 +932,8 @@ export function useCreateReport() {
  * the report it fetched is identical to what the list already describes.
  */
 export function useDownloadReport() {
-  const { downloadJson } = usePrivateApi()
-  return useMutation({
-    mutationFn: (report: SavedReport) =>
-      downloadJson<ReportPayload>(`/api/reports/${report.id}/download`, (body) =>
-        reportFilename(body.report.name, body.generated_at),
-      ),
-  })
+  const { downloadText } = usePrivateApi()
+  return useMutation({mutationFn: (report: SavedReport) => downloadText(`/api/reports/${report.id}/print.html`, `${report.name.replace(/[^a-zA-Z0-9_-]/g,'-') || 'cost-report'}.html`, 'text/html')})
 }
 
 /**

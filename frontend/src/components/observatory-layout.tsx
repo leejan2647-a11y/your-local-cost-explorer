@@ -17,6 +17,7 @@ const navigationItems = [
   { name: 'Allocation', path: '/allocation', icon: PieChart },
   { name: 'Reports', path: '/reports', icon: FileText },
   { name: 'Library', path: '/library', icon: Library },
+  { name: 'Documentation', path: '/docs', icon: Library },
   { name: 'Settings', path: '/settings', icon: Settings },
 ]
 
@@ -66,7 +67,7 @@ export function ObservatoryLayout({ children }: { children: React.ReactNode }) {
       {navigation()}
       <main id="workspace-content" tabIndex={-1} className="observatory-content">
         <div className="observatory-page">{children}</div>
-        <footer className="observatory-workspace-footer"><span>Local files only · No external connections.</span></footer>
+        <footer className="observatory-workspace-footer"><span>Local files only · No external connections.</span><Link to="/docs">How it works</Link></footer>
       </main>
       <Dialog open={navigationOpen} onOpenChange={setNavigationOpen} title="Workspace navigation" cancelLabel="Close navigation" className="observatory-drawer fixed inset-y-0 left-0 max-h-none w-[min(21rem,calc(100vw-2rem))] rounded-none">
         {navigation(true)}

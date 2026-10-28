@@ -1,6 +1,6 @@
 {
-  "version": "0.5.0",
-  "package_sha256": "8d9e4d82688a7263ee152f87f3fe97a30c713fcc1614a1aa89a954b5e1472755",
+  "version": "0.5.1",
+  "package_sha256": "6b49bfa44b72d17a2c7ab18ec6b19efa15643fdaa0a35b9df362be398a2677f8",
   "audit": "No hosted app endpoints, credentials, private records, environment files or parent Git history in package.",
   "verification": [
     "Exact-cent manual API contracts",
@@ -9,5 +9,5 @@
     "Real browser upload and analysis plus seven manual pages",
     "TypeScript and production build"
   ],
-  "limits": "No heavy laptop tests; full manual parity remains subject to further edge-case review."
+  "limits": "Bounded load probes stopped at safeguards; performance and maximum capacity remain unverified."
 }

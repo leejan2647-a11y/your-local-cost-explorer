@@ -1,0 +1,33 @@
+# How your-local-cost-explorer works
+
+## How your local review works
+
+Upload AWS CUR 1.0 or CUR 2.0 CSV, gzip or Parquet files. The app inspects source dates, then lets you choose a supported analysis window or custom dates. Earlier observations supply the baseline; explicitly selected comparison files stay separate from primary spending. Canonical processing removes proven identical copies and refuses conflicting records instead of guessing. DuckDB computes exact decimal charges and rounds monetary results to integer cents. Saved checks, file identities, findings and team mappings remain on your device.
+
+## The eight cost detectors
+
+Unexpected charge: sustained spending above the comparable baseline. Spike: individual unusually expensive days. Gradual creep: a continuing upward cost trend over 56 days, with a material rise and sufficient linear fit. New charge: a meaningful new spending group with little earlier spend. Usage-cost mismatch: cost and usage changes diverge in a comparable group. Marketplace: AWS Marketplace charges requiring review. Expectation mismatch: supplied service expectations differ from observed charges. Unused commitment: source-supported unused Savings Plan or Reserved Instance commitment. Each detector needs its relevant columns and coverage; missing evidence does not mean zero or a clean result.
+
+## Creep threshold: 10% and 20%
+
+This setting controls gradual creep only; it does not change the spike or unexpected-charge thresholds. It is a linear 30-day-normalized threshold over the trailing 56-day trend. A 20% setting requires at least 37.33% first-to-last growth over that 56-day sample, plus the materiality, fit and continuing-rise checks. A 10% setting requires 18.67%. A short export cannot establish an eight-week trend. Higher sensitivity percentages produce fewer eligible creep findings. Settings apply to newly submitted checks; saved results remain immutable.
+
+## Commitments, allocation and canonical history
+
+Commitment amounts use supported purchaser and beneficiary records and their measurement periods. Unknown consumption stays unavailable. Account-to-team mappings label allocation; they do not change the source charges. Teams History reads retained primary source evidence with authorized date scopes and canonical deduplication. It does not add overlapping check totals or finding impacts. Changed mappings require rebuilding history. Missing or changed original sources block trustworthy rebuilding.
+
+## Reports and interpretation
+
+Download report creates a structured, printable HTML document with scope, reported charges, findings, commitments and source identities. Open it in a browser and use Print / Save as PDF. Reports contain no active external connections. Finding amounts may overlap and use different periods; do not add them to invent savings or a bill. Cloud spending and usage do not establish company, revenue or profit growth. Exports do not independently prove invoice reconciliation or delivery completeness.
+
+## Installation and software requirements
+
+Node.js 20 or later, a current desktop browser, and a supported 64-bit Windows, macOS or Linux platform are required. The installer provisions a private Python 3.12 runtime and pinned dependencies. Network access is needed for initial tool installation; billing analysis runs locally. No Docker, AWS credentials, hosted account, Redis or PostgreSQL setup is needed. Platform-specific dependency availability still applies.
+
+## Hardware and safe resource use
+
+There is no commercial input-size or file-count cap. There is no universal minimum RAM or disk that guarantees a particular export will finish: compressed bytes, row width, grouping cardinality and duplicates change processing cost. For small-file use, 8 GB RAM, two CPU cores and several GB of free working disk are a practical starting recommendation, not a certified minimum. The app detects CPU affinity and cgroup quotas, gives DuckDB up to 70% of available memory, and reserves working disk and memory for the device. It can spill to disk. Not every parsing or aggregation phase uses every CPU core; allocating all available threads does not imply constant 100% CPU utilization. Resource failures stop the check without presenting partial financial results as complete. Close other applications or use a larger work drive when needed.
+
+## Privacy and recovery
+
+The service listens on 127.0.0.1 and protects API calls with a per-launch token and origin checks. It has no automatic schedules, AWS connection, hosted sign-in, email/webhook delivery or public sharing. Python outbound network connections and DuckDB automatic extension loading are disabled. Keep local data and downloaded reports private and back them up. Removing retained files preserves saved results but can prevent later canonical-history rebuilding.

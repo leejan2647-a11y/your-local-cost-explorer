@@ -1,3 +1,7 @@
+# 0.5.1
+
+Fix Teams response contract; complete canonical history aliases and finding links, invalidate stale mappings; add customer documentation and 20% creep controls; make structured printable HTML the default report download. Financial detector, source-format and ledger controls passed. Bounded load probes stopped by safeguards; performance capacity remains unverified.
+
 # 0.5.0
 
 Replace the simplified UI with the main React manual workspace. Add local API projections, canonical Teams History, printable reports and local cancellation. Remove hosted navigation and automatic integrations.

@@ -453,7 +453,7 @@ export function CheckCharges() {
     <div className="space-y-6">
       <PageHeader
         title="Check AWS Charges"
-        description="Run a comprehensive analysis to identify unusual charges"
+        description="Upload your AWS billing export to trace reported charges, unusual spending, commitments and team allocation. Comparisons use the dates and evidence in your files; missing data stays unknown. Review coverage before acting on a finding."
       />
       {status?.message ? <p role="status" className="text-body text-muted-foreground">{status.message}</p> : null}
 

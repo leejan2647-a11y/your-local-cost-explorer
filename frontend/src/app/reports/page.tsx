@@ -498,17 +498,16 @@ export function Reports() {
                         </TableCell>
                         <TableCell className="text-right">
                           <span className="inline-flex items-center gap-1">
-                            <Button variant="ghost" size="sm" onClick={()=>void downloadText('/api/reports/'+r.id+'/print.html', 'cost-report.html', 'text/html').catch(error=>setFormError(String(error)))}>Printable report</Button>
                             <Button variant="ghost" size="sm" disabled={renameReportMutation.isPending} onClick={() => { setRenaming(r.id); setRenameName(r.name); setRenameError(undefined); setFormError(null) }} aria-label={`Rename report ${r.name}`}>Rename</Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => void downloadReport(r)}
                               loading={busyId === r.id}
-                              aria-label={`Download the report “${r.name}” as JSON`}
+                              aria-label={`Download the report “${r.name}” as a printable report`}
                             >
                               <Download className="h-4 w-4" aria-hidden="true" />
-                              Download JSON
+                              Download report
                             </Button>
 
                             <Button

@@ -32,7 +32,9 @@ class MainManualContractTests(unittest.TestCase):
  def test_canonical_history(self):
   import manual_history
   with database(self.root) as c:
-   report=manual_history.accept(c,{'check_ids':[self.rid]},'history-test')
+   other=str(uuid4())
+   c.execute('INSERT INTO runs VALUES (?,?,?,?)',(other,'completed',json.dumps(self.result),'2026-10-28T00:00:01+00:00'))
+   report=manual_history.accept(c,{'check_ids':[self.rid,other]},'history-test')
   # Run in a child so its outbound-network prohibition stays isolated.
   import multiprocessing
   worker=multiprocessing.get_context('spawn').Process(target=manual_history.build,args=(self.root,report['id']))
@@ -41,6 +43,12 @@ class MainManualContractTests(unittest.TestCase):
    saved=manual_history.load(c,report['id']);self.assertEqual(saved['status'],'ready',saved['reasons']);self.assertEqual(saved['total_cents'],3015)
    result=manual_history.breakdown(c,report['id'],{'group_by':'accounts'})
    self.assertEqual(result['rows'][0]['amount_cents'],3015)
+   for group in ['teams','services','resources','principals']:
+    result=manual_history.breakdown(c,report['id'],{'group_by':group})
+    self.assertEqual(sum(r['amount_cents'] for r in result['rows']),3015)
+   manual_api.mutate(c,'/teams','POST',{'aws_account_id':'111111111111','name':'History test'})
+   self.assertEqual(manual_history.load(c,report['id'])['status'],'stale')
+   manual_api.mutate(c,'/teams/111111111111','DELETE',{})
  def test_team_settings_reports(self):
   with database(self.root) as c:
    manual_api.mutate(c,'/teams','POST',{'aws_account_id':'111111111111','name':'Platform'})

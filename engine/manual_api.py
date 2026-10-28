@@ -194,6 +194,7 @@ def mutate(con,path,method,v):
     if path=='/teams' or path.startswith('/teams/'):
         identifier=path.split('/')[-1];old=con.execute('SELECT team FROM mappings WHERE account=?',(identifier,)).fetchone();account=v.get('aws_account_id',identifier)
         manual_settings.save_team(con,{'action':'delete' if method=='DELETE' else 'add' if path=='/teams' else 'edit','account':account,'previous_account':identifier,'name':v.get('name',old[0] if old else None)})
+        con.execute("UPDATE local_history_reports SET document=json_set(document,'$.status','stale','$.recovery','Team mappings changed. Rebuild history to refresh drilldown scopes.') WHERE json_extract(document,'$.status')='ready'")
         return {'id':account,'aws_account_id':account,'name':v.get('name')}
     if path.startswith('/checks/') and len(path.split('/'))==3:
         run=load(con,path.split('/')[2])

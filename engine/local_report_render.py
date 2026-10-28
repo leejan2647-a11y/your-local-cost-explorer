@@ -1,29 +1,28 @@
-import json
+"""Standalone printable local report, with escaped evidence and exact-cent money."""
 from html import escape
+
 def render_document(data):
-    lines=["CommitOps meeting report",f"Outcome: {data['outcome']}",f"Check: {data['check_id']}",
-           f"Period: {data['window']['start']} to {data['window']['end']}",
-           "Estimates use only the AWS data provided. Cloud usage does not establish company or revenue growth.",
-           "Finding impacts can overlap and are not added to invent a bill total."]
-    for key,label in [('run_id','Run'),('scope_id','Scope'),('rule_id','Rule'),('generated_at','Calculated at')]:
-        if data.get(key):lines.append(f'{label}: {data[key]}')
-    if data.get('check_ids'):lines.append('Contributing checks: '+', '.join(data['check_ids']))
-    if 'reported_charges_cents' in data:lines.append(f"Reported AWS charges: {data['reported_charges_cents']} cents" if data['reported_charges_cents'] is not None else 'Reported AWS charges unavailable')
-    if data.get('scope'):lines.append('Rule scope: '+json.dumps(data['scope'],ensure_ascii=False))
-    for failure in data.get('failures',[]):lines.append('Source outcome: '+json.dumps(failure,ensure_ascii=False))
-    for source in data['sources']:
-        lines.append(f"Source: {source['filename']} | upload {source['id']} | SHA256 {source.get('sha256') or 'unavailable'}")
-        if source.get('status'):lines.append(f"Source outcome: {source['status']} | attempt {source.get('attempt',0)} | latest supported source timestamp {source.get('source_timestamp') or 'unavailable'}")
-        if source.get('history'):lines.append('Attempt history: '+json.dumps(source['history'],ensure_ascii=False))
-    for item in data['findings']:
-        lines.extend([f"{item['severity']}: {item['title']}",item['description'],
-            f"Detector: {item['detector']} | impact: {item['impact_cents']} cents",str(item['caveats']),
-            "Saved evidence rows are a display sample; full contribution is recorded separately."])
-        lines.extend(f"Evidence {e['reference']}: {e['amount_cents']} cents on {e['date']}" for e in item['evidence'])
-    for item in data['commitments']:
-        lines.append("Commitment: "+json.dumps(item,ensure_ascii=False,sort_keys=True))
-    if not data['findings']: lines.append("Completed: no findings" if data['outcome']=='completed' else "No findings available for this outcome")
-    lines.append('Suggested next action: '+('Correct the listed source or processing failures and review the linked check diagnostics before retrying.' if data['outcome'] in {'failed','partial_with_failure'} else 'Verify source delivery and the selected lookback; already successful versions are skipped.' if data['outcome']=='no_new_data' else 'Review source coverage and the evidence for each finding before taking action. Uploaded rows do not independently reconcile the final invoice.'))
-    text="\n".join(lines)
-    html='<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; base-uri &#39;none&#39;; form-action &#39;none&#39;"><title>CommitOps meeting report</title><body><h1>CommitOps meeting report</h1>'+''.join('<p>'+escape(line)+'</p>' for line in lines[1:])+'</body></html>'
-    return {**data,"text":text,"html":html,"state":data['outcome']}
+ def e(value):return escape(str(value if value is not None else 'Unavailable'))
+ def money(value):
+  if type(value) is not int:return 'Unavailable'
+  sign='-' if value<0 else '';v=abs(value)
+  return f'{sign}USD {v//100:,}.{v%100:02d} ({value} cents)'
+ def table(headings,rows):
+  return '<table><thead><tr>'+''.join('<th>'+e(h)+'</th>' for h in headings)+'</tr></thead><tbody>'+''.join('<tr>'+''.join('<td>'+e(v)+'</td>' for v in row)+'</tr>' for row in rows)+'</tbody></table>'
+ findings=data['findings'];commitments=data['commitments'];window=data['window']
+ body='<h1>Local cost review</h1><p class="muted">Source-observed AWS charges and investigation evidence</p>'
+ body+='<section><h2>Review scope</h2>'+table(['Check','Analysis dates','Calculated UTC','Outcome'],[[data['check_id'],str(window.get('start'))+' to '+str(window.get('end')),data.get('generated_at'),data['outcome']]])+'</section>'
+ body+='<section><h2>Reported AWS charges</h2><p class="amount">'+e(money(data.get('reported_charges_cents')))+'</p><p>Uploaded rows do not establish complete delivery or final invoice reconciliation. Missing evidence is unavailable, never assumed zero.</p></section>'
+ body+='<section><h2>Findings</h2><p>Finding amounts can overlap and measure different periods. Do not add them into a bill or savings total.</p>'
+ if not findings:body+='<p>No findings were saved for the observed scope. This does not prove the export is complete.</p>'
+ for f in findings:
+  m=f.get('amount_measurement') or {};body+='<article><h3>'+e(f['title'])+'</h3>'+table(['Detector','Severity','Amount','Measurement basis'],[[f.get('detector'),f['severity'],money(m.get('value_cents')),m.get('basis')]])+'<p>'+e(f['description'])+'</p>'
+  body+=''.join('<p class="caveat">'+e(c)+'</p>' for c in f.get('caveats',[]))
+  if f.get('evidence'):body+=table(['Reference','Amount','Date'],[[r['reference'],money(r['amount_cents']),r['date']] for r in f['evidence']])
+  body+='</article>'
+ body+='</section><section><h2>Commitments</h2>'+table(['Name / plan','Family','Purchased','Used','Unused','Account'],[[p.get('name',p.get('id')),p.get('type'),money(p.get('purchased_cents')),money(p.get('used_cents')),money(p.get('unused_cents')),p.get('account')] for p in commitments])+'</section>'
+ body+='<section><h2>Source evidence</h2>'+table(['Filename','Upload ID','SHA-256'],[[f['filename'],f['id'],f.get('sha256')] for f in data['sources']])+'</section>'
+ body+='<section><h2>Interpretation and next steps</h2><p>Estimates use only the AWS data provided. Cloud usage does not establish company or revenue growth. Verify source coverage, inspect each finding and confirm commitments against the original billing export before acting.</p></section>'
+ style='body{font:15px/1.55 system-ui,sans-serif;color:#162338;max-width:1100px;margin:40px auto;padding:0 24px}h1{font-size:34px}h2{margin-top:32px}h3{font-size:18px}.muted{color:#536375}.amount{font-size:26px;font-weight:700}table{border-collapse:collapse;width:100%;margin:14px 0;table-layout:fixed}td,th{text-align:left;vertical-align:top;border:1px solid #cdd5df;padding:10px;overflow-wrap:anywhere}th{background:#edf2f7}article{border-top:2px solid #dae1eb;padding:12px 0}.caveat{color:#745315}@media print{body{margin:0;font-size:11px}article,tr{break-inside:avoid}h2{break-after:avoid}}'
+ html='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;unsafe-inline&#39;; base-uri &#39;none&#39;; form-action &#39;none&#39;"><title>Local cost review</title><style>'+style+'</style></head><body>'+body+'</body></html>'
+ return {**data,'html':html,'text':'Local cost review: '+data['check_id'],'state':data['outcome']}

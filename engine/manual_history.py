@@ -105,6 +105,21 @@ def breakdown(con,identifier,q):
   cursor=db.execute(cte+'SELECT * FROM grouped WHERE strpos(lower(label),lower(?))>0 ORDER BY '+orders[sort]+','+columns+' LIMIT ? OFFSET ?',params+[search,limit,offset]);names=[r[0] for r in cursor.description];rows=[]
   for values in cursor.fetchall():
    item=dict(zip(names,values));child=criteria+[{k:item[k] for k in fields if k!='team_label'}];token=next((k for k,v in doc['_tokens'].items() if v==child),None) or str(uuid4());doc['_tokens'][token]=child
-   rows.append({**item,'scope_id':token,'percent':round(item['amount_cents']*100/total,4) if total>0 else None,'names':[],'finding_ids':[]})
+   aliases=[]
+   if group=='resources':
+    filters=' AND '.join(k+'=?' for k in ('account_id','service','region','resource_id'))
+    observations=db.execute("WITH x AS (SELECT date,unnest(names) AS name FROM history WHERE "+where+' AND '+filters+") SELECT name,min(date),max(date) FROM x GROUP BY name ORDER BY name LIMIT 101",params+[item[k] for k in ('account_id','service','region','resource_id')]).fetchall()
+    aliases=[{'name':n,'start':str(start),'end':str(end)} for n,start,end in observations]
+   finding_ids=[]
+   if group in {'teams','accounts','services'} and not any(set(c)&{'resource_id','principal_arn','region'} for c in criteria):
+    import manual_api
+    for check_id in doc['check_ids']:
+     for finding in manual_api.findings(con,manual_api.load(con,check_id)):
+      if finding['aws_account_id'] not in item['account_ids']:continue
+      services=[c['service'] for c in criteria if 'service' in c]+([item['service']] if group=='services' else [])
+      if any(finding['service']!=service for service in services):continue
+      if len(finding_ids)<100:finding_ids.append(finding['id'])
+   rows.append({**item,'scope_id':token,'percent':round(item['amount_cents']*100/total,4) if total>0 else None,'names':[a['name'] for a in aliases[:100]],'aliases':aliases[:100],'aliases_has_more':len(aliases)>100,'finding_ids':finding_ids})
+
  con.execute('UPDATE local_history_reports SET document=? WHERE id=?',(json.dumps(doc),identifier))
  return {'report_id':identifier,'group_by':group,'scope_id':scope,'rows':rows,'total_cents':total,'count':count,'offset':offset,'limit':limit,'has_more':offset+len(rows)<count,'coverage':doc['coverage'],'reasons':doc['reasons']}
