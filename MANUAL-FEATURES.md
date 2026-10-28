@@ -9,9 +9,9 @@
 | Commitments | Savings Plan/RI summaries, consumed/unused amounts and missing inventory reasons |
 | Allocation and team ownership | Category/account consumption and local account/team mapping snapshots |
 | Reports | Explicit whole-check JSON, readable meeting HTML, CSV and print; no sending |
-| Dashboard billing files and history | Retained upload identities, explicit removal, keyset history pagination, check archive/restore |
+| Check Charges billing files and history | Retained upload identities, explicit removal, keyset history pagination, check archive/restore |
 | Baselines and previous consumption | File-anchored 7/30/90/180-day choices, retained-check/device baselines, canonical usage comparison and observed daily history |
-| General & teams settings | Persisted company name, default date range and creep sensitivity; team add/edit/delete; documentation and hardware budgets |
+| General & teams settings | Persisted company name, default date range and creep sensitivity; team add/edit/delete; documentation and local preferences |
 | Saved reports | Generate, rename, archive/restore, download and delete immutable local report snapshots |
 | Connections/account billing/automatic settings | Not included; no hosted login, quotas, billing or provider integration |
 | Schedules, rules and automatic delivery | Absent from both runtime routes and UI; not merely hidden |
