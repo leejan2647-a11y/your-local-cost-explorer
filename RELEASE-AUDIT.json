@@ -14,6 +14,7 @@
     "dashboard filters/evidence/escaping/CSV/HTML",
     "small CSV/gzip/Parquet exact financial control with adaptive parallelism"
   ],
-  "npm_registry": "publication pending",
-  "capacity_claim": "no arbitrary-file completion guarantee"
+  "npm_registry": "public 0.3.0; integrity matches audited artifact; install with automatic setup passed",
+  "capacity_claim": "no arbitrary-file completion guarantee",
+  "verification_server": "Shutdown confirmed"
 }
