@@ -9,5 +9,5 @@
   "source": "fresh standalone repository with no parent Git history",
   "package_install": "clean npm tarball installation passed",
   "github_archive_npm_install": "passed",
-  "npm_registry": "publisher 2FA required; GitHub npm installation works now"
+  "npm_registry": "public 0.2.0 verified; integrity matches audited artifact; clean registry install passed"
 }

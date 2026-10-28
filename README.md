@@ -4,10 +4,10 @@ An offline web app for AWS Cost and Usage Reports. Analyse files on your own dev
 
 ## Public installation
 
-This GitHub-backed npm install is available now and does not require an npm login. Registry publication under `commitops-local` is pending publisher-account 2FA. The package has no installation scripts that analyse billing data.
+Published on npm as `commitops-local@0.2.0`. Installation does not require an npm login. The package has no installation scripts that analyse billing data.
 
 ```sh
-npm install -g https://github.com/leejan2647-a11y/commitops-local/archive/refs/heads/main.tar.gz
+npm install -g commitops-local
 commitops-local --setup
 commitops-local
 ```
@@ -76,4 +76,3 @@ python -m unittest discover -s tests -v
 The synthetic fixture builder under `tests/fixture.py` contains invented account IDs and billing data, with no authentication capability. The public distribution excludes the hosted API, migrations, authentication, billing, worker integrations, environment files, deployment scripts, production records and Git history.
 
 MIT licensed. Python dependencies retain their respective upstream licences and are installed separately; no third-party service code is vendored.
-
