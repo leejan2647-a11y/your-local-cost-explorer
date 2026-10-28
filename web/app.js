@@ -1,5 +1,5 @@
 'use strict';
-const token = new URLSearchParams(location.hash.slice(1)).get('token') || sessionStorage.getItem('local-token') || '';
+const token = document.querySelector('meta[name=local-session]')?.content || new URLSearchParams(location.hash.slice(1)).get('token') || sessionStorage.getItem('local-token') || '';
 if (token) sessionStorage.setItem('local-token', token);
 history.replaceState(null, '', '/');
 const $ = id => document.getElementById(id);
@@ -8,20 +8,20 @@ let fileMetadata=[], comparisonMode='history', comparisonIds=new Set(), detected
 let selected = new Set(), current = null, result = null, activeView = 'overview', pending = false, running = false;
 const titles = {overview:'Dashboard',check:'Check Charges',findings:'Findings',commitments:'Commitments',allocation:'Allocation',reports:'Reports',settings:'Settings',teams:'Team mappings',evidence:'Check history & evidence'};
 function navigate(view) {
-  activeView = view; $('view-title').textContent = titles[view];
+  activeView = view; $('new-check').hidden=view==='check'; $('view-title').textContent = titles[view];
   document.querySelectorAll('[data-panels]').forEach(panel => { panel.hidden = !panel.dataset.panels.split(' ').includes(view); });
   document.querySelectorAll('[data-view]').forEach(item => { if (item.dataset.view === view) item.setAttribute('aria-current','page'); else item.removeAttribute('aria-current'); });
   document.querySelectorAll('[data-only]').forEach(item => { item.hidden = item.dataset.only !== view; });
-  const scopes={overview:['validation','monthly_growth','comparisons','caveats'],findings:['findings','baselines'],commitments:['sp_assessment','ri_assessment','commitments'],allocation:['allocation'],teams:['teams'],reports:['caveats','input_files']};
+  const scopes={overview:[],findings:['findings','baselines'],commitments:['sp_assessment','ri_assessment','commitments'],allocation:['allocation'],teams:['teams'],reports:['caveats','input_files']};
   document.querySelectorAll('#results details').forEach(item => { item.hidden = view !== 'evidence' && !(scopes[view]||[]).includes(item.dataset.key); });
-  $('finding-table').hidden = !['overview','findings'].includes(view);
+  $('finding-table').hidden = view!=='findings';
   if(typeof renderManualPanels==='function') renderManualPanels();
   if(view==='reports')loadReports().catch(error=>status(error.message));
-  if(view==='settings'){loadSettings().catch(error=>status(error.message));loadResources().catch(error=>status(error.message));}
+  if(view==='settings'){loadSettings().catch(error=>status(error.message));}
 }
-document.querySelectorAll('[data-view]').forEach(item => { item.onclick = () => navigate(item.dataset.view); });
-$('start-check').onclick = () => { navigate('overview'); $('upload').click(); };
-$('new-check').onclick = () => { navigate(selected.size?'check':'overview'); if(!selected.size)$('upload').click(); };
+document.querySelectorAll('[data-view]').forEach(item => { item.onclick = () => { const choose=item.dataset.view==='check'&&activeView!=='check'; navigate(item.dataset.view); if(choose)$('upload').click(); }; });
+$('start-check').onclick = () => { navigate('check'); $('upload').click(); };
+$('new-check').onclick = () => { navigate('check'); $('upload').click(); };
 const money = cents => Number.isSafeInteger(cents) ? new Intl.NumberFormat(undefined,{style:'currency',currency:'USD'}).format(cents/100) : 'Unavailable';
 function renderSummary(data) {
   $('metric-charges').textContent = data ? money(data.validation?.window_total_cents) : '-';
@@ -52,7 +52,6 @@ async function refresh() {
   }
   await loadHistory();updatePeriods();
   if (!current && state.runs.length) { current = state.runs[0].id; await show(); }
-  if (!$('mappings').dataset.loaded) { $('mappings').value = Object.entries(state.mappings).map(([account, team]) => `${account} | ${team}`).join('\n'); $('mappings').dataset.loaded = 'yes'; }
 }
 async function show() {
   if (!current || pending) return;
@@ -87,9 +86,6 @@ $('analyse').onclick = async () => {
   } catch (error) { status(error.message); }
 };
 $('cancel').onclick = async () => { try { await request('/api/cancel', {method:'POST', body:'{}'}); await refresh(); await show(); } catch (error) { status(error.message); } };
-$('save-mappings').onclick = async () => {
-  try { const mappings = {}; for (const line of $('mappings').value.split('\n').filter(line => line.trim())) { const [account, team] = line.split('|').map(item => item.trim()); if (account in mappings) throw new Error('Duplicate mapped account'); mappings[account] = team; } await request('/api/mappings', {method:'POST', body:JSON.stringify({mappings})}); await loadSettings(); status('Mappings saved. New analyses use this mapping snapshot.'); } catch (error) { status(error.message); }
-};
 $('download').onclick = () => { if (!result) return; const url = URL.createObjectURL(new Blob([JSON.stringify({...result,local_review:findingUpdates},null,2)], {type:'application/json'})); const a = document.createElement('a'); a.href = url; a.download = `your-local-cost-explorer-${current}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
 $('print').onclick = () => { if(result) openPrintable(); };
 let findingUpdates={}, page=0, historyCursor=null, historyRows=[], editing=null;
@@ -188,7 +184,6 @@ async function loadSettings(reset=false){
  $('team-list').append(safeTable('Team mappings',['Name','AWS account id','Actions'],Object.entries(data.teams).map(([account,name])=>{
   const actions=document.createElement('div');actions.append(button('Edit',async()=>{editingTeam=account;$('team-name').value=name;$('team-account').value=account;$('add-team').textContent='Save';$('cancel-team').hidden=false;}),button('Delete',async()=>{if(!confirm(`Delete the team "${name}" (${account})?`))return;await request('/api/settings/teams',{method:'POST',body:JSON.stringify({action:'delete',account})});await loadSettings();}));return [name,account,actions];
  })));
- $('mappings').value=Object.entries(data.teams).map(([account,name])=>`${account} | ${name}`).join('\n');
 }
 $('save-settings').onclick=async()=>{try{await request('/api/settings',{method:'POST',body:JSON.stringify({name:$('settings-company').value,defaultDateRange:$('settings-range').value,creepMonthlyGrowthPercent:$('settings-creep').value})});await loadSettings(true);$('settings-status').textContent='Saved. Applies to future checks; saved results are unchanged.';}catch(error){$('settings-status').textContent=error.message;}};
 $('discard-settings').onclick=()=>loadSettings(true).then(()=>{$('settings-status').textContent='Changes discarded.';}).catch(error=>status(error.message));
@@ -205,8 +200,6 @@ $('generate-report').onclick=async()=>{try{await request('/api/reports/update',{
 Promise.all([refresh(),loadSettings()]).then(()=>status('Ready. Choose a saved check or start a manual analysis.')).catch(error=>status(error.message));
 setInterval(()=>{if(current&&running)show().catch(error=>status(error.message));},2500);
 
-async function loadResources(){const data=await request('/api/resources');const processing=data.processing;const size=bytes=>Number.isSafeInteger(bytes)?(bytes/1024**3).toFixed(2)+' GiB':'Unavailable';$('hardware-info').textContent=`No fixed input-size cap. ${processing.cpu_threads} available CPU threads; ${size(processing.available_memory_bytes)} available RAM, ${size(processing.duckdb_memory_bytes)} allocated to the database; ${size(processing.spill_bytes)} usable working disk. Upload storage: ${size(data.uploads.usable_bytes)} currently usable. The app reserves headroom for the operating system; successful completion is not guaranteed.`;}
-$('refresh-resources').onclick=()=>loadResources().catch(error=>status(error.message));
 
 $('report-checks').onchange=()=>{$('generate-report').disabled=!$('report-checks').selectedOptions.length;};
 $('cancel-report').onclick=()=>{$('report-name').value='';for(const option of $('report-checks').options)option.selected=false;$('generate-report').disabled=true;status('Report draft cancelled. No report was saved.');};

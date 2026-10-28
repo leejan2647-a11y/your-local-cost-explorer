@@ -75,6 +75,19 @@ class ManualHTTPTests(unittest.TestCase):
         self.assertIsNone(next(f for f in state['files'] if f['id']=='legacy')['inspection'])
         self.assertNotIn(str(self.root),json.dumps(state))
 
+    def test_page_bootstrap_and_team_creation(self):
+        connection=http.client.HTTPConnection('127.0.0.1',self.server.server_port)
+        connection.request('GET','/')
+        response=connection.getresponse();page=response.read().decode();connection.close()
+        self.assertEqual(response.status,200)
+        self.assertIn('name="local-session" content="'+self.server.token+'"',page)
+        connection=http.client.HTTPConnection('127.0.0.1',self.server.server_port)
+        connection.request('GET','/',headers={'Origin':'https://untrusted.example'})
+        response=connection.getresponse();page=response.read().decode();connection.close()
+        self.assertEqual(response.status,403);self.assertNotIn(self.server.token,page)
+        self.assertEqual(self.request('POST','/api/settings/teams',{'action':'add','account':'111111111111','name':'Platform'})[0],200)
+        self.assertEqual(self.request('GET','/api/settings')[1]['teams']['111111111111'],'Platform')
+
     def test_explicit_comparison_provenance_dates_and_separation(self):
         primary=self.upload('new.csv',b'lineItem/UsageStartDate\n2026-09-01\n2026-09-30')[1]['id']
         previous=self.upload('old.csv',b'lineItem/UsageStartDate\n2026-08-01\n2026-08-31')[1]['id']

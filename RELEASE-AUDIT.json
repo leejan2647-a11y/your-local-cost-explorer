@@ -1,7 +1,7 @@
 {
-  "version": "0.4.1",
+  "version": "0.4.2",
   "name": "your-local-cost-explorer",
-  "package_sha256": "306436448b958d95d94705cd102c5fbb981f5b66c115ab1a1004ee35d0589e72",
+  "package_sha256": "05a97b4f60ca43f2ef848c4139dcafba332b807dc462b15e5f142c0dda4c906c",
   "audit": "allowlisted package and source; no hosted clients, secrets, private environment, records or parent history",
   "financial_module_hashes": "unchanged",
   "verification": [
@@ -11,7 +11,5 @@
     "original eight-detector and commitment controls"
   ],
   "scope": "manual local-only; hardware-derived budgets; no fixed commercial byte limits",
-  "npm_registry": "public 0.4.1; latest verified",
-  "npm_integrity": "matches audited tarball",
-  "github_release": "https://github.com/leejan2647-a11y/your-local-cost-explorer/releases/tag/v0.4.1"
+  "hosted_server": "remained Shutdown; no deployment"
 }

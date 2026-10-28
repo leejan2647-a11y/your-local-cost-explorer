@@ -1,3 +1,9 @@
+# 0.4.2
+
+- Refresh local sessions securely from the origin-checked page, repairing uploads and team saves after restart.
+- Move upload/run controls to Check Charges; external check buttons open that page and its file picker. Dashboard shows summaries.
+- Remove the device resources panel and bulk mapping text area; keep structured team add/edit/delete controls.
+
 # 0.4.1
 
 - Restore the selected device baseline when switching comparison modes. Respect the saved supported date-range preference and keep empty metric placeholders as `-`. Focused DOM regression passed.

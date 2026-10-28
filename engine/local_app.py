@@ -208,7 +208,10 @@ class Handler(BaseHTTPRequestHandler):
             if not self.guard(False):
                 return
             name, kind = {'/': ('index.html', 'text/html; charset=utf-8'), '/app.js': ('app.js', 'application/javascript'), '/style.css': ('style.css', 'text/css')}[parsed.path]
-            self.respond(200, (WEB / name).read_bytes(), kind)
+            body = (WEB / name).read_bytes()
+            if parsed.path == '/':
+                body = body.replace(b'</head>', ('<meta name="local-session" content="'+self.server.token+'"></head>').encode())
+            self.respond(200, body, kind)
             return
         if not self.guard():
             return
