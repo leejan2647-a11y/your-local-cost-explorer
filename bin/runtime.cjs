@@ -70,7 +70,7 @@ async function setup(root){
   console.log('Installing private Python 3.12 and analysis dependencies. Billing files are not accessed.');
   for(const args of [['venv','--python','3.12','--managed-python','--allow-existing',info.runtime],['pip','install','--python',info.python,'--only-binary',':all:','--index-url','https://pypi.org/simple','-r',path.join(root,'requirements.txt')]]){
    const result=spawnSync(uv,args,{env,stdio:'inherit',shell:false,timeout:600000});
-   if(result.error||result.status!==0)throw Error('Runtime setup failed. Check internet access and disk space, then run commitops-local --setup to retry.');
+   if(result.error||result.status!==0)throw Error('Runtime setup failed. Check internet access and disk space, then restart commitops to retry.');
   }
   const probe=spawnSync(info.python,['-c','import duckdb,pydantic,pyarrow,pytz,dateutil,psutil'],{env,stdio:'inherit',timeout:30000});
   if(probe.error||probe.status!==0)throw Error('Installed analysis dependencies did not pass verification');

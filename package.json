@@ -1,6 +1,6 @@
 {
-  "name": "your-local-cost-explorer",
-  "version": "0.5.4",
+  "name": "commitops",
+  "version": "0.5.5",
   "repository": {
     "type": "git",
     "url": "https://github.com/leejan2647-a11y/your-local-cost-explorer.git"
@@ -9,7 +9,7 @@
   "description": "Offline AWS CUR charge analysis with a loopback web interface",
   "license": "MIT",
   "bin": {
-    "your-local-cost-explorer": "bin/commitops-local.cjs"
+    "commitops": "bin/commitops-local.cjs"
   },
   "files": [
     "bin/*.cjs",

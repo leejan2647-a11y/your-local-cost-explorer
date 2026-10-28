@@ -54,7 +54,7 @@ export function ObservatoryLayout({ children }: { children: React.ReactNode }) {
       <header className="observatory-topbar">
         <div className="flow-brand-row">
           <Button variant="ghost" size="icon" className="flow-mobile-toggle flow-secondary" aria-label="Open navigation" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={18} /></Button>
-          <Link className="public-brand brand" to="/"><SiteLogo /><span>your-local-cost-explorer</span><small className="flow-mark edition">FLOW</small></Link>
+          <Link className="public-brand brand" to="/"><SiteLogo /><span>CommitOps</span></Link>
           <span className="flow-workspace-label">Your workspace</span>
         </div>
         <div className="flow-button-row">

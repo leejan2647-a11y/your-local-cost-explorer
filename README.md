@@ -1,6 +1,6 @@
-# your-local-cost-explorer
+# CommitOps
 
-Run `npx your-local-cost-explorer` or install with `npm install -g your-local-cost-explorer` and run `your-local-cost-explorer`. Open http://127.0.0.1:43187/. Node.js 20 or newer is required. First setup downloads a managed Python runtime and the pinned analysis dependencies; later analysis runs locally. No separate database, Docker or Python installation is required.
+Run `npx commitops` or install with `npm install -g commitops` and run `commitops`. Open http://127.0.0.1:43187/. Node.js 20 or newer is required. First setup downloads a managed Python runtime and the pinned analysis dependencies; later analysis runs locally. No separate database, Docker or Python installation is required.
 
 ## Manual workspace
 

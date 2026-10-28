@@ -1,3 +1,7 @@
+# 0.5.5
+
+Publish the local app as npm package commitops with command commitops. Keep existing local data and runtime directories for continuity. Display CommitOps throughout the workspace.
+
 # 0.5.4
 
 Use loopback port 43187 by default; retain --port for conflicts. Update documentation navigation and rewrite the user guide for new users.

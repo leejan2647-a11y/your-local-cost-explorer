@@ -38,7 +38,7 @@ In Reports, select completed checks and save a named report. Download report cre
 
 ## Install and start the app
 
-Install Node.js 20 or later on a supported 64-bit Windows, macOS or Linux system. Run npm install -g your-local-cost-explorer, then run your-local-cost-explorer in a terminal and open the local address it prints. You can also clone the public repository, run npm install and then npm start. Initial setup downloads a managed Python runtime and pinned analysis dependencies, so internet access is needed for installation. You do not need to configure Python, Docker, PostgreSQL, Redis or a hosted account separately. Use a current desktop browser. Dependency availability may vary by operating system and processor architecture.
+Install Node.js 20 or later on a supported 64-bit Windows, macOS or Linux system. Run npm install -g commitops, then run commitops in a terminal and open the local address it prints. You can also clone the public repository, run npm install and then npm start. Initial setup downloads a managed Python runtime and pinned analysis dependencies, so internet access is needed for installation. You do not need to configure Python, Docker, PostgreSQL, Redis or a hosted account separately. Use a current desktop browser. Dependency availability may vary by operating system and processor architecture.
 
 ## Plan memory and disk use
 
