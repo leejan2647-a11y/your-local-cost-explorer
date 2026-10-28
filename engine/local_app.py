@@ -547,7 +547,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser(description='Offline local AWS billing analysis')
-    parser.add_argument('--port', type=int, default=8080)
+    parser.add_argument('--port', type=int, default=43187, help='Local HTTP port (default: 43187)')
     parser.add_argument('--data', type=Path, default=Path.home() / '.commitops-local')
     parser.add_argument('--work-dir', type=Path, help='Trusted local CLI choice for processing storage on another drive')
     args = parser.parse_args()

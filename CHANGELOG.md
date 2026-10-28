@@ -1,3 +1,7 @@
+# 0.5.4
+
+Use loopback port 43187 by default; retain --port for conflicts. Update documentation navigation and rewrite the user guide for new users.
+
 # 0.5.3
 
 Reuse exact encoded field fragments within bounded batches; reduce scalar identity lookups. Read history checks and labels once per page and batch resource aliases. Preserve financial results and per-request artifact verification.

@@ -1,33 +1,57 @@
-# How your-local-cost-explorer works
+# User guide
 
-## How your local review works
+## Run your first check
 
-Upload AWS CUR 1.0 or CUR 2.0 CSV, gzip or Parquet files. The app inspects source dates, then lets you choose a supported analysis window or custom dates. Earlier observations supply the baseline; explicitly selected comparison files stay separate from primary spending. Canonical processing removes proven identical copies and refuses conflicting records instead of guessing. DuckDB computes exact decimal charges and rounds monetary results to integer cents. Saved checks, file identities, findings and team mappings remain on your device.
+Start the app and open the local address shown in your terminal. Choose Check Charges and upload an AWS Cost and Usage Report in CSV, compressed CSV (.csv.gz), or Parquet format. The app reads the dates in your files so you can select the period to review. Confirm the dates, optionally add earlier comparison data, and start the check. When it finishes, review the coverage warnings as well as the findings. Files and results are stored on your device.
 
-## The eight cost detectors
+## Choose analysis and comparison data
 
-Unexpected charge: sustained spending above the comparable baseline. Spike: individual unusually expensive days. Gradual creep: a continuing upward cost trend over 56 days, with a material rise and sufficient linear fit. New charge: a meaningful new spending group with little earlier spend. Usage-cost mismatch: cost and usage changes diverge in a comparable group. Marketplace: AWS Marketplace charges requiring review. Expectation mismatch: supplied service expectations differ from observed charges. Unused commitment: source-supported unused Savings Plan or Reserved Instance commitment. Each detector needs its relevant columns and coverage; missing evidence does not mean zero or a clean result.
+Primary files supply the charges for the period you are reviewing. Earlier observations establish a baseline for detectors that compare spending over time. You can use history within your primary exports or explicitly select comparison files from your device or Library. Comparison rows do not become additional primary spending. Choose compatible billing scopes and check that the dates cover the periods you intend to compare. Missing days or columns can limit which conclusions are available.
 
-## Creep threshold: 10% and 20%
+## Understand the eight cost detectors
 
-This setting controls gradual creep only; it does not change the spike or unexpected-charge thresholds. It is a linear 30-day-normalized threshold over the trailing 56-day trend. A 20% setting requires at least 37.33% first-to-last growth over that 56-day sample, plus the materiality, fit and continuing-rise checks. A 10% setting requires 18.67%. A short export cannot establish an eight-week trend. Higher sensitivity percentages produce fewer eligible creep findings. Settings apply to newly submitted checks; saved results remain immutable.
+Unexpected charge identifies sustained spending above a comparable baseline. Spike identifies unusually expensive days. Gradual creep identifies a continuing upward trend in daily costs. New charge identifies meaningful spending in a group with little earlier spend. Usage-cost mismatch identifies cases where cost and usage changes diverge. Marketplace highlights AWS Marketplace charges for review. Expectation mismatch compares supported service expectations with observed charges when expectations have been supplied. Unused commitment identifies source-supported unused Savings Plan or Reserved Instance commitments. Each detector requires particular fields and sufficient evidence; an unavailable assessment does not mean that no problem exists.
 
-## Commitments, allocation and canonical history
+## Choose a creep detection threshold
 
-Commitment amounts use supported purchaser and beneficiary records and their measurement periods. Unknown consumption stays unavailable. Account-to-team mappings label allocation; they do not change the source charges. Teams History reads retained primary source evidence with authorized date scopes and canonical deduplication. It does not add overlapping check totals or finding impacts. Changed mappings require rebuilding history. Missing or changed original sources block trustworthy rebuilding.
+The creep monthly growth threshold sets the minimum sustained growth needed for a gradual-creep finding. Enter a positive percentage in Settings. Lower values increase sensitivity; higher values require stronger growth. This setting affects only gradual creep. The detector examines the trailing eight weeks of daily charges and scales the monthly threshold to that period using a 30-day month. It also checks that the rise is meaningful, the trend is sufficiently consistent and costs continue rising near the end. A short export or a single step change may therefore produce no finding. This is a detector sensitivity setting, not a spending cap or forecast. New settings apply to new checks; saved checks retain their original results.
 
-## Reports and interpretation
+## Read findings and financial amounts
 
-Download report creates a structured, printable HTML document with scope, reported charges, findings, commitments and source identities. Open it in a browser and use Print / Save as PDF. Reports contain no active external connections. Finding amounts may overlap and use different periods; do not add them to invent savings or a bill. Cloud spending and usage do not establish company, revenue or profit growth. Exports do not independently prove invoice reconciliation or delivery completeness.
+A finding is a lead for investigation, not proof that a charge is wrong. Open it to inspect its scope, dates, measurement basis, evidence and caveats. Different detectors measure different things: a daily change, a period excess or an unused commitment may use different time bases. Their amounts can overlap, so do not add finding amounts together to calculate a bill or guaranteed savings. Use review states, notes and labels to track your investigation. These annotations do not change the saved financial calculation.
 
-## Installation and software requirements
+## Review commitments and allocation
 
-Node.js 20 or later, a current desktop browser, and a supported 64-bit Windows, macOS or Linux platform are required. The installer provisions a private Python 3.12 runtime and pinned dependencies. Network access is needed for initial tool installation; billing analysis runs locally. No Docker, AWS credentials, hosted account, Redis or PostgreSQL setup is needed. Platform-specific dependency availability still applies.
+Commitments shows Savings Plan and Reserved Instance observations supported by the supplied billing records. Purchased, used and unused amounts can be unavailable when required evidence is missing. Allocation explains supported attribution to accounts and teams. In Settings, map an AWS account ID to a team name to make those accounts easier to recognize. A mapping changes the displayed attribution, not the underlying charges. Review measurement periods and coverage before interpreting utilization or unused amounts.
 
-## Hardware and safe resource use
+## Explore Teams History
 
-There is no commercial input-size or file-count cap. There is no universal minimum RAM or disk that guarantees a particular export will finish: compressed bytes, row width, grouping cardinality and duplicates change processing cost. For small-file use, 8 GB RAM, two CPU cores and several GB of free working disk are a practical starting recommendation, not a certified minimum. The app detects CPU affinity and cgroup quotas, gives DuckDB up to 70% of available memory, and reserves working disk and memory for the device. It can spill to disk. Not every parsing or aggregation phase uses every CPU core; allocating all available threads does not imply constant 100% CPU utilization. Resource failures stop the check without presenting partial financial results as complete. Close other applications or use a larger work drive when needed.
+Teams History builds a spending ledger from retained primary exports associated with selected completed checks. Use its date filters and drilldowns to explore teams, accounts, services, resources and supplied IAM identities. Proven duplicate observations are removed, including overlaps between checks; check totals are not simply added together. Resource names are shown only when supplied in the source. Keep original files available for rebuilding history. Missing, modified or conflicting evidence can prevent a trustworthy result. Rebuild when the app marks history stale after a mapping change.
 
-## Privacy and recovery
+## Use the dashboard and monthly insights
 
-The service listens on 127.0.0.1 and protects API calls with a per-launch token and origin checks. It has no automatic schedules, AWS connection, hosted sign-in, email/webhook delivery or public sharing. Python outbound network connections and DuckDB automatic extension loading are disabled. Keep local data and downloaded reports private and back them up. Removing retained files preserves saved results but can prevent later canonical-history rebuilding.
+The dashboard summarizes saved analysis results; use Check Charges to start a new analysis. Reported AWS charges describe the signed charges present in the selected source rows. Monthly insights distinguish spending changes from estimates of comparable daily cloud usage when complete, compatible evidence is available. Current-month observations are month to date, not a forecast. Cloud spending or usage changes do not establish company, revenue or profit growth. Read the dated periods, comparison sources and exclusions before interpreting a percentage.
+
+## Save and share a report
+
+In Reports, select completed checks and save a named report. Download report creates a structured HTML document with the review scope, reported charges, findings, commitments and source identities. Open the file in a browser to read or print it; your browser can also save it as a PDF. Share the downloaded file yourself when needed. The app does not send email, call webhooks or create public report links. Reports may contain sensitive billing information, so share them only with intended recipients.
+
+## Install and start the app
+
+Install Node.js 20 or later on a supported 64-bit Windows, macOS or Linux system. Run npm install -g your-local-cost-explorer, then run your-local-cost-explorer in a terminal and open the local address it prints. You can also clone the public repository, run npm install and then npm start. Initial setup downloads a managed Python runtime and pinned analysis dependencies, so internet access is needed for installation. You do not need to configure Python, Docker, PostgreSQL, Redis or a hosted account separately. Use a current desktop browser. Dependency availability may vary by operating system and processor architecture.
+
+## Plan memory and disk use
+
+There is no commercial file-size or batch-count limit. Processing requirements depend on row width, grouping complexity, duplicates and compression, not file size alone. For small-file use, 8 GB RAM, two CPU cores and several GB of free working disk are a practical starting recommendation, not a guaranteed minimum for every export. Start with a smaller export when trying a new device. The app uses available CPU resources, bounds its analysis-engine memory allowance and can use temporary disk storage. Some stages run sequentially. If resources are insufficient, free memory or disk space, choose a larger working drive or use a more capable device before retrying.
+
+## Recover from an unsuccessful check
+
+Read the error and coverage guidance before retrying. For format errors, use an original supported AWS CUR export and check its required columns. For date problems, select dates represented in the files and provide compatible earlier data if a comparison is needed. For source conflicts, select one authoritative export delivery rather than combining conflicting revisions. For resource failures, free memory or working disk. Cancel an active check when necessary; cancelled or failed work must not be treated as a completed financial result. Keep previously saved evidence available for review.
+
+## Keep local data private
+
+Analysis runs on your device. The service listens on the loopback address and uses a per-launch token and origin checks to protect API requests. It has no AWS connection, automatic schedules, hosted sign-in, payment processing or external delivery. Analysis-worker outbound connections and automatic database-extension downloads are disabled. Installation still contacts public dependency registries. Protect your device account, retained exports, local database and downloaded reports. Back up data you need to keep; removing retained exports can prevent later history rebuilding.
+
+## Understand evidence limits
+
+Uploaded billing rows do not independently establish complete export delivery or final invoice reconciliation. The app removes proven identical copies and refuses conflicting observations instead of guessing. Missing fields and dates remain unknown rather than being converted into zero. Monetary calculations use decimal arithmetic and the app’s cent-rounding rules. Results describe the supplied evidence and selected scope; verify coverage and relevant AWS billing records before making financial or operational decisions.
