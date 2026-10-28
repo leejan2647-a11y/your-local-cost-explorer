@@ -1,3 +1,7 @@
+# 0.5.0
+
+Replace the simplified UI with the main React manual workspace. Add local API projections, canonical Teams History, printable reports and local cancellation. Remove hosted navigation and automatic integrations.
+
 # 0.4.2
 
 - Refresh local sessions securely from the origin-checked page, repairing uploads and team saves after restart.

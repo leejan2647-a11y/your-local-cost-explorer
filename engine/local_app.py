@@ -82,6 +82,9 @@ def initialise(root):
         manual_store.initialise(con)
         import manual_settings
         manual_settings.initialise(con)
+        import manual_api
+        manual_api.initialise(con)
+        con.execute("UPDATE local_history_reports SET document=json_set(document,'$.status','failed','$.recovery','The previous worker stopped. Rebuild history from retained files.') WHERE json_extract(document,'$.status') IN ('running','queued')")
     for part in (root / 'uploads').glob('*.part'):
         part.unlink()
 
@@ -115,6 +118,7 @@ class Server(ThreadingHTTPServer):
         self.upload_lock = threading.Lock()
         self.connections = threading.BoundedSemaphore(16)
         self.active = None
+        self.history_active = None
 
     def process_request(self, request, address):
         if not self.connections.acquire(blocking=False):
@@ -151,7 +155,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'no-referrer')
-        self.send_header('Content-Security-Policy', "default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        self.send_header('Content-Security-Policy', "default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         self.end_headers()
         self.wfile.write(body)
 
@@ -204,15 +208,25 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get(self):
         parsed = urlsplit(self.path)
-        if parsed.path in ('/', '/app.js', '/style.css'):
-            if not self.guard(False):
-                return
-            name, kind = {'/': ('index.html', 'text/html; charset=utf-8'), '/app.js': ('app.js', 'application/javascript'), '/style.css': ('style.css', 'text/css')}[parsed.path]
-            body = (WEB / name).read_bytes()
-            if parsed.path == '/':
-                body = body.replace(b'</head>', ('<meta name="local-session" content="'+self.server.token+'"></head>').encode())
-            self.respond(200, body, kind)
-            return
+        if not parsed.path.startswith('/api/'):
+            if not self.guard(False): return
+            import mimetypes
+            from urllib.parse import unquote
+            requested=unquote(parsed.path).lstrip('/')
+            target=(WEB/requested).resolve()
+            if not target.is_relative_to(WEB.resolve()) or '\\' in requested:
+                self.respond(404, {'error':'Unknown asset'});return
+            if not target.is_file():
+                if '.' in requested.rsplit('/',1)[-1]:
+                    self.respond(404, {'error':'Unknown asset'});return
+                target=WEB/'index.html'
+            body=target.read_bytes();kind=mimetypes.guess_type(str(target))[0] or 'application/octet-stream'
+            if target.name=='index.html':
+                kind='text/html; charset=utf-8'
+                body=body.replace(b'</head>',('<meta name="local-session" content="'+self.server.token+'"></head>').encode())
+            self.respond(200,body,kind);return
+        if parsed.path.startswith('/api/workspace/'):
+            self.workspace_request('GET');return
         if not self.guard():
             return
         with database(self.server.root) as con:
@@ -260,6 +274,56 @@ class Handler(BaseHTTPRequestHandler):
                     self.respond(200, {'status': row[0], 'result': json.loads(row[1]) if row[1] else None, 'finding_updates': manual_store.updates(con, run_id)})
             else:
                 self.respond(404, {'error': 'Unknown route'})
+
+    def do_PATCH(self):
+        self.workspace_request('PATCH')
+
+    def do_DELETE(self):
+        self.workspace_request('DELETE')
+
+    def workspace_request(self, method):
+        if not self.guard(): return
+        parsed=urlsplit(self.path)
+        if not parsed.path.startswith('/api/workspace/'):
+            self.respond(404,{'detail':'Unknown route'});return
+        path=parsed.path.removeprefix('/api/workspace')
+        query={k:v[0] for k,v in parse_qs(parsed.query).items()}
+        try:
+            import manual_api
+            from urllib.parse import unquote
+            path=unquote(path)
+            if method=='DELETE' and path.startswith('/uploads/'):
+                self.path='/api/files/remove'
+                import io
+                raw=json.dumps({'id':path.split('/')[-1]}).encode();self.rfile=io.BytesIO(raw)
+                del self.headers['Content-Length'];self.headers['Content-Length']=str(len(raw))
+                self.do_POST();return
+            value={} if method in ('GET','DELETE') else self.read_json()
+            if method=='POST' and path=='/allocation/history/reports':
+                import manual_history
+                with self.server.operation_lock:
+                    busy=any(job and job[1].is_alive() for job in (self.server.active,self.server.history_active))
+                    if busy:
+                        self.respond(409,{'detail':'Another local analysis is running. Wait or cancel it first.'});return
+                    with database(self.server.root) as con:
+                        data=manual_history.accept(con,value,self.headers.get('Idempotency-Key',''))
+                    if data['status']=='queued':
+                        process=multiprocessing.get_context('spawn').Process(target=manual_history.build,args=(self.server.root,data['id']),daemon=True)
+                        process.start();self.server.history_active=(data['id'],process)
+                self.respond(202,data);return
+
+            with self.server.operation_lock:
+                with database(self.server.root) as con:
+                    active=self.server.active
+                    if active and not active[1].is_alive():
+                        con.execute("UPDATE runs SET status='interrupted',result=COALESCE(result,?) WHERE id=? AND status='running'",(json.dumps({'error':'Local worker stopped. Check memory and disk, then retry.'}),active[0]))
+                    data=manual_api.read(con,path,query) if method=='GET' else manual_api.mutate(con,path,method,value)
+            if isinstance(data,str):self.respond(200,data.encode(),'text/html; charset=utf-8' if path.endswith('/print.html') else 'text/csv; charset=utf-8')
+            else:self.respond(200,data)
+        except (ValueError,KeyError,TypeError,StopIteration) as error:
+            self.respond(400,{'detail':str(error) if isinstance(error,ValueError) else 'Invalid manual request'})
+        except (sqlite3.Error,OSError,MemoryError):
+            self.respond(503,{'detail':'Local storage or device resources unavailable. Retry after checking free memory and disk.'})
 
     def do_PUT(self):
         if not self.guard():
@@ -316,6 +380,8 @@ class Handler(BaseHTTPRequestHandler):
             self.server.upload_lock.release()
 
     def do_POST(self):
+        if self.path.startswith('/api/workspace/'):
+            self.workspace_request('POST');return
         if not self.guard():
             return
         try:
@@ -393,7 +459,7 @@ class Handler(BaseHTTPRequestHandler):
                 if self.path != '/api/analyse':
                     self.respond(404, {'error': 'Unknown route'})
                     return
-                if running:
+                if running or (self.server.history_active and self.server.history_active[1].is_alive()):
                     self.respond(409, {'error': 'An analysis is already running'})
                     return
                 from datetime import date
@@ -458,9 +524,19 @@ class Handler(BaseHTTPRequestHandler):
                         digest = hashlib.file_digest(stream, 'sha256').hexdigest()
                     if digest != item['sha256']:
                         raise ValueError('Stored source identity changed; upload again')
+                submission=value.get('submission_key')
+                fingerprint=json.dumps({k:v for k,v in value.items() if k not in ('submission_key','_settings')},sort_keys=True)
+                if submission:
+                    if not isinstance(submission,str) or len(submission)>128:raise ValueError('Invalid submission identity')
+                    with database(self.server.root) as con:
+                        saved=con.execute('SELECT request,run_id FROM local_submissions WHERE key=?',(submission,)).fetchone()
+                    if saved:
+                        if saved[0]!=fingerprint:raise ValueError('Submission identity reused with different inputs')
+                        self.respond(202,{'id':saved[1]});return
                 run_id = str(uuid4())
                 with database(self.server.root) as con:
                     con.execute('INSERT INTO runs VALUES (?,?,NULL,?)', (run_id, 'running', datetime.now(timezone.utc).isoformat()))
+                    if submission:con.execute('INSERT INTO local_submissions VALUES (?,?,?)',(submission,fingerprint,run_id))
                 process = multiprocessing.get_context('spawn').Process(target=job, args=(self.server.root, run_id, value, files, mappings), daemon=True)
                 process.start()
                 self.server.active = (run_id, process)

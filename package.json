@@ -1,6 +1,6 @@
 {
   "name": "your-local-cost-explorer",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/leejan2647-a11y/your-local-cost-explorer.git"
@@ -14,22 +14,21 @@
   "files": [
     "bin/*.cjs",
     "engine/**/*.py",
-    "web/*.html",
-    "web/*.js",
-    "web/*.css",
     "requirements.txt",
     "SOURCE-INVENTORY.json",
     "README.md",
     "LICENSE",
     "MANUAL-FEATURES.md",
     "DESIGN.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "web/**/*"
   ],
   "scripts": {
     "start": "node bin/commitops-local.cjs",
     "setup": "node bin/runtime.cjs",
     "postinstall": "node bin/runtime.cjs",
-    "test": "node --test tests/runtime.test.cjs tests/dashboard.test.cjs tests/date-selection.test.cjs"
+    "test": "node --test tests/runtime.test.cjs",
+    "build:ui": "npm --prefix frontend run build"
   },
   "engines": {
     "node": ">=20"
